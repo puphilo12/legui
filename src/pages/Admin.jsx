@@ -307,6 +307,64 @@ function TabResumen({ go }) {
 }
 
 /* ===================== VENTAS (POS) ===================== */
+function ProductSearch({ products, value, onChange }) {
+  const selected = products.find((p) => p.id === value)
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  const filtered = q.trim()
+    ? products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+    : products
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const pick = (p) => { onChange(p.id); setQ(''); setOpen(false) }
+  const clear = () => { onChange(''); setQ(''); setOpen(false) }
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          className="admin-input"
+          placeholder={selected ? selected.name : 'Buscar producto…'}
+          value={q}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => { setQ(e.target.value); setOpen(true) }}
+          style={{ flex: 1, fontStyle: selected && !q ? 'italic' : 'normal', color: selected && !q ? 'var(--blue)' : undefined }}
+        />
+        {selected && (
+          <button type="button" onClick={clear} style={{ background: 'none', border: 'none', color: 'var(--faint)', cursor: 'pointer', padding: '0 8px' }}>✕</button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50, background: 'var(--bg-2)', border: '1px solid var(--line-2)', borderRadius: 8, maxHeight: 260, overflowY: 'auto', marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,.4)' }}>
+          {filtered.map((p) => {
+            const noStock = (p.stock ?? 0) <= 0
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => !noStock && pick(p)}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', padding: '10px 14px', background: 'none', border: 'none', borderBottom: '1px solid var(--line)', textAlign: 'left', cursor: noStock ? 'not-allowed' : 'pointer', opacity: noStock ? 0.45 : 1, color: 'var(--text)' }}
+              >
+                <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
+                <span style={{ fontSize: 12, color: noStock ? 'var(--red)' : 'var(--muted)' }}>
+                  {money(effPrice(p))} · {noStock ? 'sin stock' : `${p.stock} u.`}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TabVentas() {
   const products = useStore((s) => s.products)
   const orders = useStore((s) => s.orders)
@@ -340,10 +398,11 @@ function TabVentas() {
         <form className="admin-card" onSubmit={submit}>
           <div style={{ marginBottom: 14 }}>
             <label className="admin-label">Producto</label>
-            <select className="admin-input" value={f.productId} onChange={(e) => set({ productId: e.target.value, size: '', color: '' })}>
-              <option value="">Elegí un producto…</option>
-              {products.map((p) => (<option key={p.id} value={p.id} disabled={(p.stock ?? 0) <= 0}>{p.name} — {money(effPrice(p))} {(p.stock ?? 0) <= 0 ? '(sin stock)' : `(${p.stock} u.)`}</option>))}
-            </select>
+            <ProductSearch
+              products={products}
+              value={f.productId}
+              onChange={(id) => set({ productId: id, size: '', color: '' })}
+            />
           </div>
           {product && (product.sizes || []).length > 0 && (
             <div style={{ marginBottom: 14 }}>
