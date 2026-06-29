@@ -15,6 +15,7 @@ const PAY_LABEL = {
   whatsapp: 'A coordinar por WhatsApp',
   transferencia: 'Transferencia',
   efectivo: 'Efectivo',
+  mercadopago: 'Mercado Pago',
 }
 
 export default function Checkout() {
@@ -96,9 +97,12 @@ export default function Checkout() {
     if (!f.nombre.trim() || !f.telefono.trim()) return toast('Completá nombre y teléfono', 'info')
     if (f.entrega === 'envio' && !f.direccion.trim()) return toast('Completá la dirección de envío', 'info')
     setSubmitting(true)
+
     const res = await placeOrder({ customer: { ...f }, paymentMethod: f.paymentMethod })
-    setSubmitting(false)
-    if (!res.ok) return toast(res.error || 'No se pudo crear el pedido', 'info')
+    if (!res.ok) {
+      setSubmitting(false)
+      return toast(res.error || 'No se pudo crear el pedido', 'info')
+    }
 
     // Save buyer profile for next time
     if (!MOCK && user && !isAdmin) {
@@ -113,10 +117,32 @@ export default function Checkout() {
       }).catch(() => {})
     }
 
+    // Mercado Pago: crear preferencia y redirigir
+    if (f.paymentMethod === 'mercadopago') {
+      try {
+        const mpRes = await fetch('/api/mp-preference', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: cart, customer: f, external_reference: res.order.id }),
+        })
+        const mpData = await mpRes.json()
+        if (!mpRes.ok) throw new Error(mpData.error || 'Error MP')
+        const sandbox = import.meta.env.VITE_MP_SANDBOX === 'true'
+        const url = sandbox ? mpData.sandbox_init_point : mpData.init_point
+        if (url) { window.location.href = url; return }
+        throw new Error('No se obtuvo URL de pago')
+      } catch (err) {
+        toast('Error al conectar con Mercado Pago: ' + err.message, 'error')
+        setSubmitting(false)
+        return
+      }
+    }
+
     const wa = (f.paymentMethod === 'whatsapp' || f.paymentMethod === 'transferencia') ? buildWhatsApp(res.order) : null
     if (wa) window.open(wa, '_blank')
     setDone({ ...res.order, wa })
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    setSubmitting(false)
   }
 
   const doLogin = async (e) => {
@@ -180,9 +206,10 @@ export default function Checkout() {
   }
 
   const PAYS = [
-    { id: 'whatsapp', icon: MessageCircle, label: 'Coordinar por WhatsApp', desc: 'Te escribimos para cerrar pago y envío.' },
-    { id: 'transferencia', icon: Landmark, label: 'Transferencia', desc: settings.alias ? `Alias: ${settings.alias}` : 'Te pasamos los datos bancarios.' },
+    { id: 'mercadopago', icon: null, label: 'Mercado Pago', desc: 'Tarjetas, débito y dinero en cuenta. Pago 100% seguro.' },
+    { id: 'transferencia', icon: Landmark, label: 'Transferencia bancaria', desc: settings.alias ? `Alias: ${settings.alias}` : 'Te pasamos los datos bancarios.' },
     { id: 'efectivo', icon: Wallet, label: 'Efectivo', desc: 'Pagás al retirar o al recibir.' },
+    { id: 'whatsapp', icon: MessageCircle, label: 'Coordinar por WhatsApp', desc: 'Te escribimos para cerrar pago y envío.' },
   ]
 
   return (
@@ -273,31 +300,30 @@ export default function Checkout() {
 
           <h3 style={{ margin: '8px 0 12px' }}>Pago</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 10 }}>
-            {PAYS.map((p) => (
-              <button type="button" key={p.id} onClick={() => set({ paymentMethod: p.id })}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
-                  padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
-                  background: f.paymentMethod === p.id ? 'var(--blue-soft)' : 'var(--bg-2)',
-                  border: `1px solid ${f.paymentMethod === p.id ? 'var(--blue)' : 'var(--line)'}`,
-                  color: 'var(--text)',
-                }}>
-                <p.icon size={20} style={{ color: 'var(--blue)', flexShrink: 0 }} />
-                <span style={{ flex: 1 }}>
-                  <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>{p.label}</span>
-                  <span style={{ display: 'block', fontSize: 12, color: 'var(--faint)' }}>{p.desc}</span>
-                </span>
-                <span style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${f.paymentMethod === p.id ? 'var(--blue)' : 'var(--line-3)'}`, background: f.paymentMethod === p.id ? 'var(--blue)' : 'transparent', flexShrink: 0 }} />
-              </button>
-            ))}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderRadius: 12, background: 'var(--bg-2)', border: '1px dashed var(--line-2)', opacity: 0.7 }}>
-              <CreditCardMP />
-              <span style={{ flex: 1 }}>
-                <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>Pagar con Mercado Pago</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--faint)' }}>Tarjetas, débito y dinero en cuenta.</span>
-              </span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--faint)', border: '1px solid var(--line-2)', borderRadius: 999, padding: '4px 9px' }}>Próximamente</span>
-            </div>
+            {PAYS.map((p) => {
+              const active = f.paymentMethod === p.id
+              return (
+                <button type="button" key={p.id} onClick={() => set({ paymentMethod: p.id })}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
+                    padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
+                    background: active ? 'var(--blue-soft)' : 'var(--bg-2)',
+                    border: `1px solid ${active ? 'var(--blue)' : 'var(--line)'}`,
+                    color: 'var(--text)',
+                  }}>
+                  {p.icon ? (
+                    <p.icon size={20} style={{ color: 'var(--blue)', flexShrink: 0 }} />
+                  ) : (
+                    <CreditCardMP />
+                  )}
+                  <span style={{ flex: 1 }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 14 }}>{p.label}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: 'var(--faint)' }}>{p.desc}</span>
+                  </span>
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${active ? 'var(--blue)' : 'var(--line-3)'}`, background: active ? 'var(--blue)' : 'transparent', flexShrink: 0 }} />
+                </button>
+              )
+            })}
           </div>
 
           {f.paymentMethod === 'transferencia' && (
@@ -350,7 +376,11 @@ export default function Checkout() {
               </div>
             </div>
             <button type="submit" className="btn btn-blue btn-block" style={{ marginTop: 16 }} disabled={submitting}>
-              {submitting ? 'Procesando…' : 'Confirmar pedido'}
+              {submitting
+                ? 'Procesando…'
+                : f.paymentMethod === 'mercadopago'
+                  ? 'Ir a Mercado Pago →'
+                  : 'Confirmar pedido'}
             </button>
             <p style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 12 }}>
               <ShieldCheck size={14} /> Tus datos están protegidos
