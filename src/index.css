@@ -512,7 +512,7 @@ label.field {
   display: inline-flex;
   white-space: nowrap;
   will-change: transform;
-  animation: marquee 26s linear infinite;
+  animation: marquee 14s linear infinite;
 }
 .marquee-track.rev {
   animation-name: marqueeR;
