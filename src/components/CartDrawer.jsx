@@ -13,7 +13,6 @@ export default function CartDrawer() {
   const removeFromCart = useStore((s) => s.removeFromCart)
   const clearCart = useStore((s) => s.clearCart)
   const settings = useStore((s) => s.settings)
-  const toast = useStore((s) => s.toast)
 
   const subtotal = cart.reduce((n, i) => n + i.price * i.qty, 0)
   const threshold = settings?.free_shipping_threshold || 0
@@ -25,25 +24,9 @@ export default function CartDrawer() {
     return () => document.body.classList.remove('body-lock')
   }, [open])
 
-  const checkout = () => {
-    const phone = (settings?.whatsapp || '').replace(/\D/g, '')
-    if (!phone) {
-      toast('Configurá el WhatsApp en el panel admin', 'info')
-      return
-    }
-    const lines = cart.map(
-      (i) =>
-        `• ${i.qty}x ${i.name}` +
-        (i.size ? ` · Talle ${i.size}` : '') +
-        (i.color ? ` · ${i.color}` : '') +
-        ` — ${money(i.price * i.qty)}`
-    )
-    const msg =
-      `Hola LEGUI! 👋 Quiero hacer este pedido:\n\n` +
-      `${lines.join('\n')}\n\n` +
-      `Subtotal: ${money(subtotal)}\n\n` +
-      `¿Me confirman stock, envío y forma de pago? Gracias!`
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+  const goToWhatsAppCheckout = () => {
+    close()
+    navigate('/checkout')
   }
 
   if (!open) return null
@@ -232,7 +215,7 @@ export default function CartDrawer() {
             >
               Finalizar compra
             </button>
-            <button className="btn btn-ghost btn-block" onClick={checkout} style={{ marginBottom: 10 }}>
+            <button className="btn btn-ghost btn-block" onClick={goToWhatsAppCheckout} style={{ marginBottom: 10 }}>
               <MessageCircle size={16} /> Pedir por WhatsApp
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
