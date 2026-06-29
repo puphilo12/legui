@@ -141,14 +141,16 @@ export default function Header() {
               </Link>
             )}
 
-            <button
-              className="btn btn-ghost btn-sm hide-mobile"
-              onClick={() => navigate(isAdmin ? '/admin' : '/admin')}
-              style={{ padding: '9px 14px' }}
-              title="Panel de administración"
-            >
-              <SlidersHorizontal size={14} /> Admin
-            </button>
+            {isAdmin && (
+              <button
+                className="btn btn-ghost btn-sm hide-mobile"
+                onClick={() => navigate('/admin')}
+                style={{ padding: '9px 14px' }}
+                title="Panel de administración"
+              >
+                <SlidersHorizontal size={14} /> Admin
+              </button>
+            )}
           </div>
         </div>
 
@@ -261,16 +263,18 @@ export default function Header() {
                 Iniciar sesión
               </Link>
             )}
-            <button
-              className="btn btn-ghost"
-              style={{ marginTop: 18 }}
-              onClick={() => {
-                closeMenu()
-                navigate('/admin')
-              }}
-            >
-              <SlidersHorizontal size={15} /> Panel admin
-            </button>
+            {isAdmin && (
+              <button
+                className="btn btn-ghost"
+                style={{ marginTop: 18 }}
+                onClick={() => {
+                  closeMenu()
+                  navigate('/admin')
+                }}
+              >
+                <SlidersHorizontal size={15} /> Panel admin
+              </button>
+            )}
           </div>
         </div>
       )}
