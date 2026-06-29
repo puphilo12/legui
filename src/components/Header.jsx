@@ -125,7 +125,7 @@ export default function Header() {
               {count > 0 && <span className="cart-count">{count}</span>}
             </button>
 
-            {/* Cuenta comprador — solo si logueado y no admin */}
+            {/* Cuenta comprador */}
             {!MOCK && user && !isAdmin && (
               <Link
                 to="/mi-cuenta"
@@ -138,6 +138,16 @@ export default function Header() {
                 {pendingOrders > 0 && (
                   <span className="cart-count" style={{ background: 'var(--blue)' }}>{pendingOrders}</span>
                 )}
+              </Link>
+            )}
+            {!MOCK && !user && !isAdmin && (
+              <Link
+                to="/mi-cuenta"
+                className="icon-btn hide-mobile"
+                aria-label="Iniciar sesión"
+                title="Iniciar sesión"
+              >
+                <UserCircle size={20} />
               </Link>
             )}
 
