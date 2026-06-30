@@ -780,7 +780,9 @@ function TabProductos() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
         <h1 className="anton admin-h" style={{ marginBottom: 0 }}>Productos</h1>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-ghost btn-sm" onClick={resetProducts}><RotateCcw size={14} /> Resetear</button>
+          {MOCK && (
+            <button className="btn btn-ghost btn-sm" onClick={resetProducts}><RotateCcw size={14} /> Resetear</button>
+          )}
           <button className="btn btn-blue btn-sm" onClick={onNew}><Plus size={14} /> Nuevo</button>
         </div>
       </div>
