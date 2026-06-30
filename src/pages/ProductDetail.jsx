@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus } from 'lucide-react'
-import { useStore, effPrice } from '../store/useStore'
+import { useStore, effPrice, variantStock } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
+import { useSEO, SITE_URL } from '../hooks/useSEO'
 import { money } from '../utils/format'
 import ProductCard from '../components/ProductCard'
 import SizeGuide from '../components/SizeGuide'
@@ -20,26 +21,55 @@ export default function ProductDetail() {
   const product = useMemo(() => getProduct(slug), [slug, products, getProduct])
   const related = useMemo(() => relatedFn(product), [product, relatedFn])
 
-  const gallery = useMemo(() => {
-    if (!product) return []
-    const imgs = [...(product.images || []), ...(product.colors || []).map((c) => c.image)]
-    return [...new Set([product.image, ...imgs].filter(Boolean))]
-  }, [product])
-
   const [color, setColor] = useState(null)
   const [size, setSize] = useState(null)
   const [qty, setQty] = useState(1)
   const [mainImg, setMainImg] = useState('')
   const [guide, setGuide] = useState(false)
 
+  const gallery = useMemo(() => {
+    if (!product) return []
+    if (color?.images?.length) return [...new Set(color.images)]
+    return [...new Set([product.image, ...(product.images || [])].filter(Boolean))]
+  }, [product, color])
+
   useEffect(() => {
-    setColor(product?.colors?.[0] || null)
+    const def = product?.colors?.find((c) => c.default) || product?.colors?.[0] || null
+    setColor(def)
     setSize(null)
     setQty(1)
-    setMainImg(product?.colors?.[0]?.image || product?.images?.[0] || product?.image || '')
+    setMainImg(def?.images?.[0] || product?.images?.[0] || product?.image || '')
   }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => { setQty(1) }, [color, size])
+
   useReveal([product?.id, related.length])
+
+  useSEO({
+    title: product ? product.name : 'Producto no encontrado',
+    description: product
+      ? (product.description || `${product.name} — ${product.category} en LEGUI. Envíos a todo el país, pago seguro.`)
+      : undefined,
+    image: mainImg || product?.image,
+    path: `/producto/${slug}`,
+    noindex: !product,
+    jsonLd: product ? {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      image: gallery.length ? gallery : [product.image].filter(Boolean),
+      description: product.description || `${product.name} — LEGUI streetwear`,
+      sku: product.id,
+      category: product.category,
+      offers: {
+        '@type': 'Offer',
+        url: `${SITE_URL}/producto/${slug}`,
+        priceCurrency: 'ARS',
+        price: effPrice(product),
+        availability: (product.sold_out || (product.stock ?? 0) <= 0) ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      },
+    } : null,
+  })
 
   if (!product) {
     return (
@@ -53,9 +83,11 @@ export default function ProductDetail() {
 
   const hasDiscount = product.discount_price && product.discount_price < product.price
   const off = hasDiscount ? Math.round((1 - product.discount_price / product.price) * 100) : 0
-  const stock = product.stock ?? 0
-  const soldOut = product.sold_out || stock <= 0
+  const soldOut = product.sold_out || (product.stock ?? 0) <= 0
   const needSize = (product.sizes || []).length > 0
+  const selStock = variantStock(product, color, size)
+  const variantSoldOut = size !== null && selStock !== null && selStock <= 0
+  const stock = selStock ?? product.stock ?? 0
   const fav = favorites.includes(product.id)
 
   const add = () => {
@@ -64,6 +96,7 @@ export default function ProductDetail() {
       toast('Elegí un talle', 'info')
       return
     }
+    if (variantSoldOut) return
     addToCart(product, { color, size, qty })
   }
 
@@ -184,7 +217,8 @@ export default function ProductDetail() {
                     title={c.name}
                     onClick={() => {
                       setColor(c)
-                      if (c.image) setMainImg(c.image)
+                      setSize(null)
+                      setMainImg(c.images?.[0] || product.image || '')
                     }}
                   />
                 ))}
@@ -207,23 +241,27 @@ export default function ProductDetail() {
                 </button>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-                {product.sizes.map((s) => (
-                  <button
-                    key={s}
-                    className={`size${size === s ? ' on' : ''}`}
-                    onClick={() => setSize(s)}
-                    disabled={soldOut}
-                  >
-                    {s}
-                  </button>
-                ))}
+                {product.sizes.map((s) => {
+                  const sStock = variantStock(product, color, s)
+                  const sOut = sStock !== null && sStock <= 0
+                  return (
+                    <button
+                      key={s}
+                      className={`size${size === s ? ' on' : ''}`}
+                      onClick={() => !sOut && setSize(s)}
+                      disabled={soldOut || sOut}
+                    >
+                      {s}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
 
           {/* cantidad + comprar */}
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 14, flexWrap: 'wrap' }}>
-            {!soldOut && (
+            {!soldOut && !variantSoldOut && (
               <div className="qty">
                 <button onClick={() => setQty((q) => Math.max(1, q - 1))} aria-label="Menos"><Minus size={15} /></button>
                 <span>{qty}</span>
@@ -234,9 +272,9 @@ export default function ProductDetail() {
               className="btn btn-blue"
               style={{ flex: 1, minWidth: 200 }}
               onClick={add}
-              disabled={soldOut}
+              disabled={soldOut || variantSoldOut}
             >
-              {soldOut ? 'Agotado' : 'Agregar al carrito'}
+              {soldOut || variantSoldOut ? 'Agotado' : 'Agregar al carrito'}
             </button>
             <button
               className={`icon-btn${fav ? ' on' : ''}`}

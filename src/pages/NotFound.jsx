@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
+import { useSEO } from '../hooks/useSEO'
 
 export default function NotFound() {
+  useSEO({ title: 'Página no encontrada', noindex: true })
+
   return (
     <div
       className="wrap"

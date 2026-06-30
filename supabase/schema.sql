@@ -71,7 +71,7 @@ create table if not exists public.products (
   description    text,
   image          text,                                 -- imagen principal
   images         jsonb       not null default '[]'::jsonb,  -- ["url", ...]
-  colors         jsonb       not null default '[]'::jsonb,  -- [{ "name","hex","image" }]
+  colors         jsonb       not null default '[]'::jsonb,  -- [{ "name","hex","images":[...hasta 4],"default":bool }]
   sizes          jsonb       not null default '[]'::jsonb,  -- ["38","39",...] | ["S","M",...]
   stock          integer     not null default 0,
   cost           integer     not null default 0,           -- costo unitario (para ganancia/COGS)
@@ -83,6 +83,7 @@ create table if not exists public.products (
 -- columnas agregadas después (idempotente)
 alter table public.products add column if not exists cost integer not null default 0;
 alter table public.products add column if not exists low_stock_threshold integer not null default 5;
+alter table public.products add column if not exists stock_matrix jsonb not null default '{}'::jsonb; -- { "<color>": { "<talle>": cantidad } }, color "" = sin variante de color
 
 create index if not exists products_store_idx     on public.products (store_id);
 create index if not exists products_category_idx  on public.products (store_id, category);

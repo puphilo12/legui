@@ -2,14 +2,7 @@ import { Link } from 'react-router-dom'
 import { Instagram, Music2, Youtube, Twitter, Facebook } from 'lucide-react'
 import Logo from './Logo'
 import { useStore } from '../store/useStore'
-
-// Acepta un usuario ("legui"), un @handle o una URL completa.
-const socialUrl = (val, base) => {
-  if (!val) return null
-  const v = String(val).trim().replace(/^@/, '')
-  if (!v) return null
-  return /^https?:\/\//i.test(v) ? v : base + v
-}
+import { socialUrl } from '../utils/format'
 
 export default function Footer() {
   const settings = useStore((s) => s.settings)

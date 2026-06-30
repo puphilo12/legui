@@ -29,3 +29,11 @@ export function slugify(str = '') {
 export function uid(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 }
+
+// Acepta un usuario ("legui"), un @handle o una URL completa.
+export function socialUrl(val, base) {
+  if (!val) return null
+  const v = String(val).trim().replace(/^@/, '')
+  if (!v) return null
+  return /^https?:\/\//i.test(v) ? v : base + v
+}

@@ -62,11 +62,35 @@ export const effPrice = (p) => Number(p?.discount_price ?? p?.price ?? 0)
 
 const cartKey = (id, color, size) => `${id}|${color || '-'}|${size || '-'}`
 
+// Stock por variante: stock_matrix = { [colorName||'']: { [talle]: cantidad } }
+const colorKey = (color) => color?.name || color || ''
+
+// Cantidad disponible para una combinación color+talle, o null si el producto no usa stock por variante.
+export const variantStock = (product, color, size) => {
+  const matrix = product?.stock_matrix
+  if (!matrix || !size || !Object.keys(matrix).length) return null
+  const bucket = matrix[colorKey(color)]
+  if (!bucket) return null
+  return bucket[size] ?? 0
+}
+
+const matrixTotal = (matrix) =>
+  Object.values(matrix || {}).reduce((sum, bucket) => sum + Object.values(bucket || {}).reduce((a, b) => a + (Number(b) || 0), 0), 0)
+
+const decrementVariant = (matrix, color, size, qty) => {
+  if (!matrix || !size) return matrix
+  const key = colorKey(color)
+  const bucket = matrix[key]
+  if (!bucket || !(size in bucket)) return matrix
+  return { ...matrix, [key]: { ...bucket, [size]: Math.max(0, (bucket[size] ?? 0) - qty) } }
+}
+
 const normalizeProduct = (row) => ({
   ...row,
   images: row.images || (row.image ? [row.image] : []),
-  colors: row.colors || [],
+  colors: (row.colors || []).map((c) => ({ ...c, images: c.images || (c.image ? [c.image] : []) })),
   sizes: row.sizes || [],
+  stock_matrix: row.stock_matrix || {},
 })
 
 // Sync a Supabase (fire-and-forget)
@@ -218,7 +242,7 @@ export const useStore = create((set, get) => ({
     if (MOCK) {
       set({
         settings: { ...MOCK_SETTINGS, ...(read(LS.settings, null) || {}) },
-        products: (() => { const s = read(LS.products, null); return Array.isArray(s) && s.length ? s : MOCK_PRODUCTS })(),
+        products: (() => { const s = read(LS.products, null); return Array.isArray(s) && s.length ? s : MOCK_PRODUCTS })().map(normalizeProduct),
         collections: (() => { const s = read(LS.collections, null); return Array.isArray(s) ? s : MOCK_COLLECTIONS })(),
         lookbook: (() => { const s = read(LS.lookbook, null); return Array.isArray(s) ? s : MOCK_LOOKBOOK })(),
         drops: (() => { const s = read(LS.drops, null); return Array.isArray(s) ? s : MOCK_DROPS })(),
@@ -252,7 +276,7 @@ export const useStore = create((set, get) => ({
     } catch (err) {
       console.error('LEGUI · carga fallida, modo mock:', err)
       set({
-        settings: MOCK_SETTINGS, products: MOCK_PRODUCTS,
+        settings: MOCK_SETTINGS, products: MOCK_PRODUCTS.map(normalizeProduct),
         collections: MOCK_COLLECTIONS, lookbook: MOCK_LOOKBOOK, drops: MOCK_DROPS,
         loading: false, ready: true,
       })
@@ -307,18 +331,20 @@ export const useStore = create((set, get) => ({
   // Carrito
   // ------------------------------------------------------------------
   addToCart(product, { color = null, size = null, qty = 1 } = {}) {
-    const key = cartKey(product.id, color?.name || color, size)
+    const colorName = color?.name || color || null
+    const key = cartKey(product.id, colorName, size)
+    const cap = variantStock(product, colorName, size) ?? product.stock ?? 99
     set((s) => {
       const existing = s.cart.find((i) => i.key === key)
       let cart
       if (existing) {
-        cart = s.cart.map((i) => i.key === key ? { ...i, qty: Math.min(i.qty + qty, i.stock || 99) } : i)
+        cart = s.cart.map((i) => i.key === key ? { ...i, qty: Math.min(i.qty + qty, cap) } : i)
       } else {
         cart = [...s.cart, {
           key, id: product.id, slug: slugify(product.name), name: product.name,
-          price: effPrice(product), image: color?.image || product.image || (product.images || [])[0],
-          color: color?.name || color || null, colorHex: color?.hex || null, size: size || null,
-          qty, stock: product.stock ?? 99,
+          price: effPrice(product), image: color?.images?.[0] || product.image || (product.images || [])[0],
+          color: colorName, colorHex: color?.hex || null, size: size || null,
+          qty: Math.min(qty, cap), stock: cap,
         }]
       }
       write(LS.cart, cart)
@@ -387,24 +413,43 @@ export const useStore = create((set, get) => ({
       write(LS.products, products)
       return { products }
     })
+    // Los borradores (recién creados, todavía no guardados) no existen en Supabase:
+    // no hay nada que actualizar ahí hasta que se confirme la creación.
+    if (get().products.find((p) => p.id === id)?._draft) return
     sbDebounce(_pd, id, 800, async () => {
       const p = get().products.find((x) => x.id === id)
       if (p) await supabase.from('products').update(patch).eq('id', id)
     })
   },
 
+  // Crea el producto solo en el estado local (borrador) — todavía no toca Supabase.
+  // Se confirma recién al guardar/cerrar el editor (ver saveDraftProduct).
   async addProduct() {
     const seed = `https://picsum.photos/seed/legui-${Date.now()}/800/1000`
     const np = {
       id: uid('p'), store_id: STORE_ID, name: 'Nuevo producto', category: 'Ropa',
       price: 0, discount_price: null, tag: 'Nuevo', sold_out: false, featured: false,
       is_offer: false, description: '', image: seed, images: [seed], colors: [], sizes: ['S', 'M', 'L', 'XL'],
-      stock: 10, cost: 0, low_stock_threshold: 5, sort: 0,
+      stock: 10, stock_matrix: {}, cost: 0, low_stock_threshold: 5, sort: 0,
+      _draft: true,
     }
     set((s) => { const products = [np, ...s.products]; write(LS.products, products); return { products } })
-    sbSync(async () => { await supabase.from('products').insert(np) })
-    get().toast('Producto agregado')
     return np.id
+  },
+
+  // Confirma un borrador: recién acá se crea de verdad en Supabase.
+  // Si el producto no es un borrador (ya estaba guardado), no hace nada.
+  saveDraftProduct(id) {
+    const p = get().products.find((x) => x.id === id)
+    if (!p || !p._draft) return
+    const { _draft, ...clean } = p
+    set((s) => {
+      const products = s.products.map((x) => x.id === id ? clean : x)
+      write(LS.products, products)
+      return { products }
+    })
+    sbSync(async () => { await supabase.from('products').insert(clean) })
+    get().toast('Producto creado')
   },
 
   deleteProduct(id) {
@@ -415,7 +460,7 @@ export const useStore = create((set, get) => ({
 
   resetProducts() {
     try { localStorage.removeItem(LS.products) } catch { /* noop */ }
-    set({ products: MOCK_PRODUCTS })
+    set({ products: MOCK_PRODUCTS.map(normalizeProduct) })
     get().toast('Catálogo restaurado')
   },
 
@@ -498,7 +543,8 @@ export const useStore = create((set, get) => ({
     const unit = effPrice(product)
     const surcharge = SURCHARGE[paymentMethod] || 0
     const total = Math.round(unit * quantity * (1 + surcharge))
-    const newStock = Math.max(0, (product.stock ?? 0) - quantity)
+    const newMatrix = decrementVariant(product.stock_matrix, color, size, quantity)
+    const newStock = newMatrix !== product.stock_matrix ? matrixTotal(newMatrix) : Math.max(0, (product.stock ?? 0) - quantity)
     const now = new Date().toISOString()
 
     const order = {
@@ -509,7 +555,7 @@ export const useStore = create((set, get) => ({
     }
 
     set((s) => {
-      const products = s.products.map((p) => p.id === productId ? { ...p, stock: newStock, sold_out: newStock <= 0 } : p)
+      const products = s.products.map((p) => p.id === productId ? { ...p, stock: newStock, sold_out: newStock <= 0, stock_matrix: newMatrix } : p)
       const orders = [order, ...s.orders]
       let customers = s.customers
       if (paymentMethod === 'cuenta-corriente') {
@@ -528,7 +574,7 @@ export const useStore = create((set, get) => ({
 
     sbSync(async () => {
       await supabase.from('orders').insert(order)
-      await supabase.from('products').update({ stock: newStock, sold_out: newStock <= 0 }).eq('id', productId)
+      await supabase.from('products').update({ stock: newStock, sold_out: newStock <= 0, stock_matrix: newMatrix }).eq('id', productId)
       if (paymentMethod === 'cuenta-corriente') {
         const c = get().customers.find((x) => x.dni === (customerDni || '-'))
         if (c) await supabase.from('customers').upsert({ ...c, store_id: STORE_ID })
@@ -557,10 +603,13 @@ export const useStore = create((set, get) => ({
 
     set((s) => {
       const newProducts = s.products.map((p) => {
-        const qty = cart.filter((i) => i.id === p.id).reduce((n, i) => n + i.qty, 0)
+        const cartItems = cart.filter((i) => i.id === p.id)
+        const qty = cartItems.reduce((n, i) => n + i.qty, 0)
         if (!qty) return p
-        const ns = Math.max(0, (p.stock ?? 0) - qty)
-        return { ...p, stock: ns, sold_out: ns <= 0 }
+        let matrix = p.stock_matrix
+        cartItems.forEach((i) => { matrix = decrementVariant(matrix, i.color, i.size, i.qty) })
+        const ns = matrix !== p.stock_matrix ? matrixTotal(matrix) : Math.max(0, (p.stock ?? 0) - qty)
+        return { ...p, stock: ns, sold_out: ns <= 0, stock_matrix: matrix }
       })
       const orders = [order, ...s.orders]
       write(LS.products, newProducts)
@@ -576,7 +625,7 @@ export const useStore = create((set, get) => ({
       // Actualizar stock en Supabase
       const updatedProducts = get().products.filter((p) => cart.some((i) => i.id === p.id))
       for (const p of updatedProducts) {
-        supabase.from('products').update({ stock: p.stock, sold_out: p.sold_out }).eq('id', p.id).then(({ error }) => {
+        supabase.from('products').update({ stock: p.stock, sold_out: p.sold_out, stock_matrix: p.stock_matrix }).eq('id', p.id).then(({ error }) => {
           if (error) console.error('stock update:', error)
         })
       }

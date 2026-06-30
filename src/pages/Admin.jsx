@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wallet, Boxes,
   Image as ImageIcon, ArrowLeft, Plus, Trash2, Upload, RotateCcw,
-  AlertTriangle, CreditCard, ChevronRight, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound,
+  AlertTriangle, CreditCard, ChevronRight, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
 } from 'lucide-react'
-import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS } from '../store/useStore'
+import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS, variantStock } from '../store/useStore'
+import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
 import { uploadMedia } from '../utils/image'
@@ -154,6 +155,8 @@ export default function Admin() {
   const [tab, setTab] = useState('resumen')
   const products = useStore((s) => s.products)
   const critCount = products.filter(isCrit).length
+
+  useSEO({ title: 'Admin', path: '/admin', noindex: true })
 
   // Auth gate
   if (!MOCK && authLoading) {
@@ -313,8 +316,13 @@ function ProductSearch({ products, value, onChange }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
 
-  const filtered = q.trim()
-    ? products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()))
+  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filtered = terms.length
+    ? products.filter((p) => {
+        const haystack = [p.name, p.category, ...(p.colors || []).map((c) => c.name)]
+          .filter(Boolean).join(' ').toLowerCase()
+        return terms.every((t) => haystack.includes(t))
+      })
     : products
 
   useEffect(() => {
@@ -404,19 +412,35 @@ function TabVentas() {
               onChange={(id) => set({ productId: id, size: '', color: '' })}
             />
           </div>
-          {product && (product.sizes || []).length > 0 && (
-            <div style={{ marginBottom: 14 }}>
-              <label className="admin-label">Talle</label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {product.sizes.map((sz) => (<button type="button" key={sz} className={`size${f.size === sz ? ' on' : ''}`} onClick={() => set({ size: sz })}>{sz}</button>))}
-              </div>
-            </div>
-          )}
           {product && (product.colors || []).length > 0 && (
             <div style={{ marginBottom: 14 }}>
               <label className="admin-label">Color</label>
               <div style={{ display: 'flex', gap: 10 }}>
-                {product.colors.map((c) => (<button type="button" key={c.name} className={`swatch${f.color === c.name ? ' on' : ''}`} style={{ background: c.hex }} title={c.name} onClick={() => set({ color: c.name })} />))}
+                {product.colors.map((c) => (<button type="button" key={c.name} className={`swatch${f.color === c.name ? ' on' : ''}`} style={{ background: c.hex }} title={c.name} onClick={() => set({ color: c.name, size: '' })} />))}
+              </div>
+            </div>
+          )}
+          {product && (product.sizes || []).length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <label className="admin-label">Talle</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {product.sizes.map((sz) => {
+                  const sizeStock = variantStock(product, f.color, sz)
+                  const noSzStock = sizeStock !== null && sizeStock <= 0
+                  return (
+                    <button
+                      type="button" key={sz}
+                      className={`size${f.size === sz ? ' on' : ''}`}
+                      onClick={() => !noSzStock && set({ size: sz })}
+                      disabled={noSzStock}
+                      style={{ opacity: noSzStock ? 0.4 : 1, position: 'relative' }}
+                      title={sizeStock !== null ? `${sizeStock} u.` : undefined}
+                    >
+                      {sz}
+                      {sizeStock !== null && <span style={{ display: 'block', fontSize: 9, color: noSzStock ? 'var(--red)' : 'var(--faint)', lineHeight: 1 }}>{sizeStock}u</span>}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -733,6 +757,7 @@ function TabProductos() {
   const products = useStore((s) => s.products)
   const updateProduct = useStore((s) => s.updateProduct)
   const addProduct = useStore((s) => s.addProduct)
+  const saveDraftProduct = useStore((s) => s.saveDraftProduct)
   const deleteProduct = useStore((s) => s.deleteProduct)
   const resetProducts = useStore((s) => s.resetProducts)
   const [editingId, setEditingId] = useState(null)
@@ -741,6 +766,13 @@ function TabProductos() {
   const onNew = async () => {
     const id = await addProduct()
     if (id) setEditingId(id)
+  }
+
+  // Si lo que se está cerrando es un borrador recién creado, recién ahora se
+  // confirma en Supabase — así "Nuevo" no crea el producto hasta que se guarda.
+  const closeEditor = () => {
+    if (editing?._draft) saveDraftProduct(editing.id)
+    setEditingId(null)
   }
 
   return (
@@ -759,7 +791,7 @@ function TabProductos() {
       {editing && (
         <ProductEditorDrawer
           product={editing}
-          onClose={() => setEditingId(null)}
+          onClose={closeEditor}
           updateProduct={updateProduct}
           onDelete={() => { deleteProduct(editing.id); setEditingId(null) }}
         />
@@ -826,8 +858,11 @@ function ProductEditorDrawer({ product: p, onClose, updateProduct, onDelete }) {
           </div>
           <div style={{ marginBottom: 12 }}>
             <label className="admin-label">Talles (separados por coma)</label>
-            <input className="admin-input" value={(p.sizes || []).join(', ')} onChange={(e) => updateProduct(p.id, { sizes: e.target.value.split(',').map((x) => x.trim()).filter(Boolean) })} />
+            <SizesInput product={p} updateProduct={updateProduct} />
           </div>
+          {(p.sizes || []).length > 0 && (
+            <StockMatrixEditor product={p} updateProduct={updateProduct} />
+          )}
           <div style={{ marginBottom: 12 }}>
             <label className="admin-label">Descripción</label>
             <textarea className="admin-input" rows={3} value={p.description || ''} onChange={(e) => updateProduct(p.id, { description: e.target.value })} />
@@ -850,6 +885,31 @@ function ProductEditorDrawer({ product: p, onClose, updateProduct, onDelete }) {
       </aside>
     </>
   )
+}
+
+// Texto local: si derivamos el value directo de (sizes||[]).join(', '), la coma
+// que el usuario tipea desaparece al instante (split+filter la descarta antes de
+// que termine de escribir el talle siguiente). Por eso el input vive aparte y
+// solo se parsea a array al cambiar.
+function SizesInput({ product: p, updateProduct }) {
+  const [raw, setRaw] = useState((p.sizes || []).join(', '))
+
+  const onChange = (e) => {
+    const val = e.target.value
+    setRaw(val)
+    const sizes = val.split(',').map((x) => x.trim()).filter(Boolean)
+    const colorKeys = (p.colors || []).length ? p.colors.map((c) => c.name) : ['']
+    const stock_matrix = {}
+    colorKeys.forEach((ck) => {
+      const prevBucket = (p.stock_matrix || {})[ck] || {}
+      const bucket = {}
+      sizes.forEach((sz) => { bucket[sz] = prevBucket[sz] ?? 0 })
+      stock_matrix[ck] = bucket
+    })
+    updateProduct(p.id, { sizes, stock_matrix })
+  }
+
+  return <input className="admin-input" value={raw} onChange={onChange} />
 }
 
 /* ===================== CONTENIDO ===================== */
@@ -1092,10 +1152,57 @@ function TogglePill({ on, onClick, children }) {
 
 function ColorsEditor({ product, updateProduct }) {
   const colors = product.colors || []
-  const setColors = (next) => updateProduct(product.id, { colors: next })
-  const update = (i, patch) => setColors(colors.map((c, idx) => idx === i ? { ...c, ...patch } : c))
-  const add = () => setColors([...colors, { name: 'Color', hex: '#1b3fe0', image: product.image || '' }])
-  const del = (i) => setColors(colors.filter((_, idx) => idx !== i))
+  const sizes = product.sizes || []
+  const update = (i, patch) => {
+    const oldName = colors[i]?.name
+    const fullPatch = { colors: colors.map((c, idx) => idx === i ? { ...c, ...patch } : c) }
+    if (patch.name && patch.name !== oldName && product.stock_matrix?.[oldName]) {
+      const stock_matrix = { ...product.stock_matrix }
+      stock_matrix[patch.name] = stock_matrix[oldName]
+      delete stock_matrix[oldName]
+      fullPatch.stock_matrix = stock_matrix
+    }
+    updateProduct(product.id, fullPatch)
+  }
+  const add = () => {
+    const next = [...colors, { name: `Color ${colors.length + 1}`, hex: '#1b3fe0', images: product.image ? [product.image] : [], default: colors.length === 0 }]
+    const patch = { colors: next }
+    if (sizes.length) {
+      const bucket = {}
+      sizes.forEach((sz) => { bucket[sz] = 0 })
+      const stock_matrix = { ...(product.stock_matrix || {}) }
+      delete stock_matrix['']
+      stock_matrix[next[next.length - 1].name] = bucket
+      patch.stock_matrix = stock_matrix
+    }
+    updateProduct(product.id, patch)
+  }
+  const setDefault = (i) => {
+    const next = colors.map((c, idx) => ({ ...c, default: idx === i }))
+    const firstImg = (next[i].images || [])[0]
+    const patch = { colors: next }
+    if (firstImg) {
+      patch.image = firstImg
+      patch.images = [firstImg, ...((product.images || []).filter((x) => x !== firstImg))]
+    }
+    updateProduct(product.id, patch)
+  }
+  const del = (i) => {
+    const removed = colors[i]
+    const next = colors.filter((_, idx) => idx !== i)
+    const patch = { colors: next }
+    if (removed?.name && product.stock_matrix) {
+      const stock_matrix = { ...product.stock_matrix }
+      delete stock_matrix[removed.name]
+      if (next.length === 0 && sizes.length) {
+        const bucket = {}
+        sizes.forEach((sz) => { bucket[sz] = 0 })
+        stock_matrix[''] = bucket
+      }
+      patch.stock_matrix = stock_matrix
+    }
+    updateProduct(product.id, patch)
+  }
   return (
     <div style={{ marginTop: 12 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -1103,16 +1210,94 @@ function ColorsEditor({ product, updateProduct }) {
         <button type="button" className="btn btn-ghost btn-sm" style={{ padding: '5px 10px' }} onClick={add}><Plus size={13} /> Color</button>
       </div>
       {colors.map((c, i) => (
-        <div key={i} style={{ border: '1px solid var(--line)', borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div key={i} style={{ border: `1px solid ${c.default ? 'var(--blue)' : 'var(--line)'}`, borderRadius: 10, padding: 10, marginBottom: 8 }}>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
             <input type="color" value={c.hex || '#000000'} onChange={(e) => update(i, { hex: e.target.value })} style={{ width: 34, height: 34, border: '1px solid var(--line-2)', borderRadius: 8, background: 'transparent', padding: 2, cursor: 'pointer', flexShrink: 0 }} />
             <input className="admin-input" placeholder="Nombre (ej. Rojo)" value={c.name || ''} onChange={(e) => update(i, { name: e.target.value })} />
+            <button
+              type="button" onClick={() => setDefault(i)}
+              aria-label="Marcar como color principal" title="Mostrar como color principal"
+              style={{ background: 'none', border: '1px solid var(--line-2)', color: c.default ? 'var(--blue)' : 'var(--faint)', width: 34, height: 34, borderRadius: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Star size={14} fill={c.default ? 'currentColor' : 'none'} />
+            </button>
             <button type="button" onClick={() => del(i)} aria-label="Quitar color" style={{ background: 'none', border: '1px solid var(--line-2)', color: 'var(--red)', width: 34, height: 34, borderRadius: 8, flexShrink: 0 }}><Trash2 size={14} /></button>
           </div>
-          <ImageInput compact folder="products" w={70} ratio="1/1" value={c.image} onChange={(v) => update(i, { image: v })} />
+          {c.default && <div style={{ fontSize: 11, color: 'var(--blue)', marginBottom: 8 }}>★ Color principal — se muestra primero en la tienda</div>}
+          <ColorImagesEditor images={c.images} onChange={(images) => update(i, { images })} />
         </div>
       ))}
       {colors.length === 0 && <p style={{ fontSize: 12, color: 'var(--faint)' }}>Sin colores. Agregá uno y subí su foto.</p>}
+    </div>
+  )
+}
+
+function ColorImagesEditor({ images, onChange }) {
+  const imgs = images || []
+  const setAt = (i, v) => {
+    const next = [...imgs]
+    if (v) next[i] = v; else next.splice(i, 1)
+    onChange(next.filter(Boolean))
+  }
+  const rows = imgs.length < 4 ? [...imgs, ''] : imgs
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {rows.map((img, i) => (
+        <ImageInput key={i} compact folder="products" w={56} ratio="1/1" value={img} onChange={(v) => setAt(i, v)} />
+      ))}
+      <span style={{ fontSize: 11, color: 'var(--faint)' }}>{imgs.length}/4 fotos</span>
+    </div>
+  )
+}
+
+function StockMatrixEditor({ product: p, updateProduct }) {
+  const sizes = p.sizes || []
+  const colors = p.colors || []
+  const colorKeys = colors.length ? colors.map((c) => c.name) : ['']
+  const matrix = p.stock_matrix || {}
+
+  const setCell = (colorName, sz, value) => {
+    const qty = Number(value) || 0
+    const stock_matrix = { ...matrix }
+    stock_matrix[colorName] = { ...(stock_matrix[colorName] || {}), [sz]: qty }
+    const total = Object.values(stock_matrix).reduce((sum, bucket) => sum + Object.values(bucket).reduce((a, b) => a + b, 0), 0)
+    updateProduct(p.id, { stock_matrix, stock: total, sold_out: total <= 0 })
+  }
+
+  const total = Object.values(matrix).reduce((sum, bucket) => sum + Object.values(bucket || {}).reduce((a, b) => a + (Number(b) || 0), 0), 0)
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <label className="admin-label">Stock por {colors.length ? 'color y talle' : 'talle'}</label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {colorKeys.map((colorName) => (
+          <div key={colorName || '_'}>
+            {colors.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 14, height: 14, borderRadius: '50%', background: colors.find((c) => c.name === colorName)?.hex || '#888', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{colorName || 'Sin nombre'}</span>
+              </div>
+            )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {sizes.map((sz) => (
+                <div key={sz} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 48, fontSize: 13, fontWeight: 600 }}>T{sz}</span>
+                  <input
+                    type="number" min="0" className="admin-input"
+                    style={{ width: 90 }}
+                    value={(matrix[colorName] || {})[sz] ?? 0}
+                    onChange={(e) => setCell(colorName, sz, e.target.value)}
+                  />
+                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>u.</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div style={{ fontSize: 12, color: 'var(--faint)' }}>
+          Total: {total} u. (se actualiza el stock global automáticamente)
+        </div>
+      </div>
     </div>
   )
 }

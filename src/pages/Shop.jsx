@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { SlidersHorizontal, X, Search, PackageX } from 'lucide-react'
 import { useStore, effPrice } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
+import { useSEO } from '../hooks/useSEO'
 import ProductCard from '../components/ProductCard'
 
 const SORTS = [
@@ -54,13 +55,12 @@ export default function Shop() {
     if (size) l = l.filter((p) => (p.sizes || []).includes(size))
     if (offer) l = l.filter((p) => p.discount_price && p.discount_price < p.price)
     if (q) {
-      const t = q.toLowerCase()
-      l = l.filter(
-        (p) =>
-          p.name.toLowerCase().includes(t) ||
-          (p.category || '').toLowerCase().includes(t) ||
-          (p.description || '').toLowerCase().includes(t)
-      )
+      const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
+      l = l.filter((p) => {
+        const haystack = [p.name, p.category, p.description, ...(p.colors || []).map((c) => c.name)]
+          .filter(Boolean).join(' ').toLowerCase()
+        return terms.every((t) => haystack.includes(t))
+      })
     }
     if (sort === 'precio-asc') l.sort((a, b) => effPrice(a) - effPrice(b))
     else if (sort === 'precio-desc') l.sort((a, b) => effPrice(b) - effPrice(a))
@@ -69,6 +69,15 @@ export default function Shop() {
   }, [products, cat, size, offer, q, sort])
 
   useReveal([list.length])
+
+  useSEO({
+    title: q ? `Resultados para "${q}"` : cat ? cat : 'Tienda',
+    description: cat
+      ? `Comprá ${cat.toLowerCase()} en LEGUI — streetwear y zapatillas urbanas, envíos a todo el país.`
+      : 'Catálogo completo de LEGUI: zapatillas, ropa y accesorios streetwear. Stock limitado, drops semanales.',
+    path: cat ? `/tienda?cat=${encodeURIComponent(cat)}` : '/tienda',
+    noindex: !!q, // resultados de búsqueda interna: no indexar (contenido duplicado/efímero)
+  })
 
   const activeCount = [cat, size, q, offer ? '1' : ''].filter(Boolean).length
   const clearAll = () => setParams(new URLSearchParams(), { replace: true })

@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Heart } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
+import { useSEO } from '../hooks/useSEO'
 import ProductCard from '../components/ProductCard'
 
 export default function Favorites() {
@@ -9,6 +10,7 @@ export default function Favorites() {
   const favorites = useStore((s) => s.favorites)
   const list = products.filter((p) => favorites.includes(p.id))
   useReveal([list.length])
+  useSEO({ title: 'Favoritos', path: '/favoritos', noindex: true })
 
   return (
     <div className="wrap section">

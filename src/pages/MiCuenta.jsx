@@ -5,6 +5,7 @@ import {
   Clock, CheckCircle, Truck, AlertCircle, X, Eye, EyeOff, KeyRound,
 } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
 import ProductCard from '../components/ProductCard'
@@ -264,6 +265,8 @@ export default function MiCuenta() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('pedidos')
+
+  useSEO({ title: 'Mi cuenta', path: '/mi-cuenta', noindex: true })
 
   const isRecovery = searchParams.get('recovery') === '1'
 

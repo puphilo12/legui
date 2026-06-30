@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, Truck, Store, MessageCircle, Landmark, Wallet, ShieldCheck, Copy, MapPin, User, LogIn } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
 
@@ -38,6 +39,8 @@ export default function Checkout() {
   const [loginPw, setLoginPw] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
   const set = (patch) => setF((s) => ({ ...s, ...patch }))
+
+  useSEO({ title: 'Checkout', path: '/checkout', noindex: true })
 
   // Auto-fill from buyer profile
   useEffect(() => {

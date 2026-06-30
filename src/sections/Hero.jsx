@@ -35,14 +35,6 @@ export default function Hero() {
         style={{ padding: '64px 0 80px', minHeight: '76vh', alignItems: 'center' }}
       >
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <div
-            className="eyebrow"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 22 }}
-          >
-            <span style={{ width: 8, height: 8, background: 'var(--blue)', display: 'inline-block' }} />
-            {settings.hero_badge || 'Temporada 26 · En vivo'}
-          </div>
-
           <h1
             className="anton"
             style={{
@@ -58,7 +50,7 @@ export default function Hero() {
               const tail = words.pop()
               return (
                 <span key={i}>
-                  {words.join(' ')} <span style={{ color: 'var(--blue)' }}>{tail}</span>
+                  {words.join(' ')} <span style={{ color: '#fff' }}>{tail}</span>
                 </span>
               )
             })}
