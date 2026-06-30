@@ -85,6 +85,14 @@ const decrementVariant = (matrix, color, size, qty) => {
   return { ...matrix, [key]: { ...bucket, [size]: Math.max(0, (bucket[size] ?? 0) - qty) } }
 }
 
+const restoreVariant = (matrix, color, size, qty) => {
+  if (!matrix || !size) return matrix
+  const key = colorKey(color)
+  const bucket = matrix[key]
+  if (!bucket || !(size in bucket)) return matrix
+  return { ...matrix, [key]: { ...bucket, [size]: (bucket[size] ?? 0) + qty } }
+}
+
 const normalizeProduct = (row) => ({
   ...row,
   images: row.images || (row.image ? [row.image] : []),
@@ -591,6 +599,13 @@ export const useStore = create((set, get) => ({
     if (!cart.length) return { ok: false, error: 'El carrito está vacío' }
 
     const total = cart.reduce((n, i) => n + i.price * i.qty, 0)
+    // El stock queda reservado mientras el pedido está "Pendiente". Pasado el plazo
+    // sin confirmarse, el cron (api/cancel-expired-orders.js) lo cancela y devuelve
+    // el stock. Mercado Pago se confirma solo (webhook, ver api/mp-webhook.js) así
+    // que 48hs alcanza; el resto depende de que vos confirmes el pago a mano
+    // (comprobante de transferencia, etc.), por eso tienen más margen.
+    const RESERVE_HOURS = paymentMethod === 'mercadopago' ? 48 : 72
+    const reservedUntil = new Date(Date.now() + RESERVE_HOURS * 60 * 60 * 1000).toISOString()
     const order = {
       id: uid('o'), store_id: STORE_ID, created_at: new Date().toISOString(),
       channel, status: 'Pendiente', payment_method: paymentMethod, customer,
@@ -598,7 +613,7 @@ export const useStore = create((set, get) => ({
         id: i.id, name: i.name, price: i.price, qty: i.qty, size: i.size, color: i.color,
         cost: Number(products.find((p) => p.id === i.id)?.cost || 0),
       })),
-      total, created_by: user?.id || null, user_id: user?.id || null,
+      total, created_by: user?.id || null, user_id: user?.id || null, reserved_until: reservedUntil,
     }
 
     set((s) => {
@@ -639,8 +654,41 @@ export const useStore = create((set, get) => ({
   },
 
   updateOrderStatus(id, status) {
-    set((s) => { const orders = s.orders.map((o) => o.id === id ? { ...o, status } : o); write(LS.orders, orders); return { orders } })
-    sbSync(async () => { await supabase.from('orders').update({ status }).eq('id', id) })
+    const order = get().orders.find((o) => o.id === id)
+    // Si se cancela un pedido que no estaba ya cancelado, devolvemos el stock reservado.
+    const restoring = status === 'Cancelado' && order && order.status !== 'Cancelado'
+
+    set((s) => {
+      let products = s.products
+      if (restoring) {
+        products = s.products.map((p) => {
+          const items = order.items.filter((i) => i.id === p.id)
+          if (!items.length) return p
+          let matrix = p.stock_matrix
+          let stock = p.stock ?? 0
+          items.forEach((i) => {
+            matrix = restoreVariant(matrix, i.color, i.size, i.qty)
+            stock += i.qty
+          })
+          const ns = matrix !== p.stock_matrix ? matrixTotal(matrix) : stock
+          return { ...p, stock: ns, sold_out: ns <= 0, stock_matrix: matrix }
+        })
+        write(LS.products, products)
+      }
+      const orders = s.orders.map((o) => o.id === id ? { ...o, status } : o)
+      write(LS.orders, orders)
+      return { orders, products }
+    })
+
+    sbSync(async () => {
+      await supabase.from('orders').update({ status }).eq('id', id)
+      if (restoring) {
+        const updated = get().products.filter((p) => order.items.some((i) => i.id === p.id))
+        for (const p of updated) {
+          await supabase.from('products').update({ stock: p.stock, sold_out: p.sold_out, stock_matrix: p.stock_matrix }).eq('id', p.id)
+        }
+      }
+    })
   },
   deleteOrder(id) {
     set((s) => { const orders = s.orders.filter((o) => o.id !== id); write(LS.orders, orders); return { orders } })

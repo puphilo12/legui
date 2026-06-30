@@ -160,6 +160,13 @@ create table if not exists public.orders (
 );
 create index if not exists orders_store_idx on public.orders (store_id, created_at desc);
 
+-- columnas agregadas después (idempotente)
+alter table public.orders add column if not exists payment_id     text;
+alter table public.orders add column if not exists user_id        uuid references auth.users(id) on delete set null;
+-- hasta esta fecha se reserva el stock de un pedido de Mercado Pago sin pagar;
+-- pasado este momento sin confirmación, el cron de api/cancel-expired-orders.js lo cancela y devuelve el stock.
+alter table public.orders add column if not exists reserved_until timestamptz;
+
 -- ---- expenses: gastos ----
 create table if not exists public.expenses (
   id          text        primary key default gen_random_uuid()::text,
