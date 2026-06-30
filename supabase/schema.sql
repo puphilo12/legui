@@ -53,6 +53,9 @@ alter table public.settings add column if not exists banner_url  text;
 alter table public.settings add column if not exists youtube     text;
 alter table public.settings add column if not exists twitter     text;
 alter table public.settings add column if not exists facebook    text;
+alter table public.settings add column if not exists pickup_enabled   boolean not null default false;
+alter table public.settings add column if not exists showroom_address text;
+alter table public.settings add column if not exists maintenance_mode boolean not null default false;
 
 -- ---------------------------------------------------------------------
 -- products: catálogo

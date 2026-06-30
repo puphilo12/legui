@@ -4,6 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Receipt, Wallet, Boxes,
   Image as ImageIcon, ArrowLeft, Plus, Trash2, Upload, RotateCcw,
   AlertTriangle, CreditCard, ChevronRight, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
+  Wrench, BookOpen,
 } from 'lucide-react'
 import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS, variantStock } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
@@ -155,6 +156,13 @@ export default function Admin() {
   const [tab, setTab] = useState('resumen')
   const products = useStore((s) => s.products)
   const critCount = products.filter(isCrit).length
+  const settings = useStore((s) => s.settings)
+  const updateSettings = useStore((s) => s.updateSettings)
+
+  const toggleMaintenance = () => {
+    if (!settings.maintenance_mode && !window.confirm('Esto apaga la tienda para todos los visitantes (vos vas a poder seguir entrando acá al admin). ¿Confirmás?')) return
+    updateSettings({ maintenance_mode: !settings.maintenance_mode })
+  }
 
   useSEO({ title: 'Admin', path: '/admin', noindex: true })
 
@@ -190,6 +198,7 @@ export default function Admin() {
     { id: 'stock', label: 'Stock', icon: Boxes, badge: critCount || null },
     { id: 'productos', label: 'Productos', icon: ImageIcon },
     { id: 'contenido', label: 'Contenido', icon: Store },
+    { id: 'manual', label: 'Manual', icon: BookOpen },
   ]
 
   return (
@@ -212,6 +221,17 @@ export default function Admin() {
               {user.email}
             </div>
           )}
+          <button
+            className="btn btn-sm btn-block"
+            onClick={toggleMaintenance}
+            style={{
+              color: settings.maintenance_mode ? '#fff' : 'var(--muted)',
+              background: settings.maintenance_mode ? 'var(--red)' : 'transparent',
+              border: `1px solid ${settings.maintenance_mode ? 'var(--red)' : 'var(--line-2)'}`,
+            }}
+          >
+            <Wrench size={14} /> {settings.maintenance_mode ? 'Mantenimiento: activado' : 'Página en mantenimiento'}
+          </button>
           <Link to="/" className="btn btn-ghost btn-sm btn-block">
             <ArrowLeft size={14} /> Ver tienda
           </Link>
@@ -232,6 +252,7 @@ export default function Admin() {
         {tab === 'stock' && <TabStock />}
         {tab === 'productos' && <TabProductos />}
         {tab === 'contenido' && <TabContenido />}
+        {tab === 'manual' && <TabManual />}
       </main>
     </div>
   )
@@ -912,6 +933,104 @@ function SizesInput({ product: p, updateProduct }) {
   }
 
   return <input className="admin-input" value={raw} onChange={onChange} />
+}
+
+/* ===================== MANUAL ===================== */
+function ManualSection({ title, children }) {
+  return (
+    <div className="admin-card" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginBottom: 10 }}>{title}</h3>
+      <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--muted)' }}>{children}</div>
+    </div>
+  )
+}
+
+function TabManual() {
+  return (
+    <>
+      <h1 className="anton admin-h">Manual</h1>
+      <p className="muted" style={{ marginBottom: 22, fontSize: 13 }}>
+        Guía rápida del panel — y qué hace falta cambiar si en el futuro reusás esta misma plataforma para otra tienda.
+      </p>
+
+      <ManualSection title="📊 Resumen">
+        Vista general: ventas del día/mes, ganancia estimada, productos con stock crítico y accesos rápidos a las
+        demás secciones.
+      </ManualSection>
+
+      <ManualSection title="🛒 Vender (mostrador)">
+        Para cargar una venta presencial (en el local, no por la web). Buscás el producto, elegís color y talle
+        (si tiene), cantidad y medio de pago. Descuenta el stock de esa combinación exacta automáticamente y
+        registra el ingreso. Si el pago es "Cuenta corriente", queda anotado como fiado en esa sección.
+      </ManualSection>
+
+      <ManualSection title="🧾 Pedidos">
+        Los pedidos hechos desde la tienda online (checkout). Acá cambiás el estado (Pendiente → Pagado → Enviado →
+        Entregado) a medida que avanza cada uno. Si el pago fue por Mercado Pago, el estado se actualiza solo cuando
+        MP confirma el cobro.
+      </ManualSection>
+
+      <ManualSection title="💳 Cuenta corriente">
+        Clientes que compran "fiado". Acá ves cuánto debe cada uno y registrás los pagos que van haciendo.
+      </ManualSection>
+
+      <ManualSection title="💸 Gastos">
+        Carga manual de gastos del negocio (mercadería, alquiler, sueldos, etc.) para que el Resumen calcule la
+        ganancia real, no solo lo que entra.
+      </ManualSection>
+
+      <ManualSection title="📦 Stock">
+        Listado completo de stock por producto, con alerta cuando un producto está por debajo del mínimo que le
+        configuraste (campo "Mínimo" en el editor del producto).
+      </ManualSection>
+
+      <ManualSection title="🖼️ Productos">
+        Acá se carga el catálogo. Por cada producto:
+        <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+          <li><b>Talles</b>: separados por coma (ej: "38, 39, 40, 41, 42").</li>
+          <li><b>Colores</b>: cada uno con su nombre, su color (para el swatch) y hasta 4 fotos propias. La ⭐
+            marca cuál color se muestra primero en la tienda y en la foto de portada del producto en la grilla.</li>
+          <li><b>Stock por color y talle</b>: una vez que cargaste talles (y colores, si aplica), aparece una
+            tabla para poner la cantidad exacta de cada combinación — ej. Negra T42: 10, Azul T42: 5. El stock
+            total del producto se calcula solo, sumando todo.</li>
+        </ul>
+        "Nuevo" crea el producto en borrador: no se guarda en la base hasta que cerrás el editor (botón "Listo",
+        la X, o tocando afuera). Si tocás "Eliminar" antes de cerrar, no queda nada cargado.
+      </ManualSection>
+
+      <ManualSection title="🎨 Contenido">
+        Datos generales de la tienda: marca, WhatsApp, redes sociales, envío gratis desde cuánto, datos bancarios
+        para transferencia, colecciones del home y lookbook. Hay que tocar "Guardar cambios" para que se aplique.
+      </ManualSection>
+
+      <ManualSection title="🔧 Página en mantenimiento">
+        El botón del costado izquierdo apaga la tienda para todos los visitantes y muestra una pantalla simple de
+        "Volvemos enseguida" con tu WhatsApp/Instagram. Vos seguís pudiendo entrar a <code>/admin</code> normalmente
+        mientras está activo, para poder desactivarlo cuando quieras.
+      </ManualSection>
+
+      <ManualSection title="♻️ Reutilizar esta plataforma para otra tienda">
+        La lógica (carrito, stock por variante, checkout, Mercado Pago, panel admin) es genérica — lo que cambia
+        por cliente es esto:
+        <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+          <li><b>Supabase</b>: crear un proyecto nuevo y correr <code>supabase/schema.sql</code> ahí (tablas, RLS,
+            todo incluido).</li>
+          <li><b>Variables de entorno</b> (en Vercel, no en el código): <code>VITE_SUPABASE_URL</code>,{' '}
+            <code>VITE_SUPABASE_ANON_KEY</code>, <code>VITE_STORE_ID</code>, <code>VITE_MP_PUBLIC_KEY</code>,{' '}
+            <code>MP_ACCESS_TOKEN</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>SUPABASE_URL</code>,{' '}
+            <code>APP_URL</code>.</li>
+          <li><b>Marca</b>: reemplazar <code>/public/logo.png</code>, <code>favicon.png</code> y <code>og.jpg</code>,
+            y el nombre "LEGUI" donde aparece fijo en el código (<code>index.html</code>, el footer, el hook de
+            SEO). El color principal (<code>--blue</code>) y el resto de la paleta se cambian en{' '}
+            <code>src/index.css</code>.</li>
+          <li><b>Admins</b>: se agregan a mano en la tabla <code>admin_roles</code> de Supabase (por email) — no
+            hay una pantalla para esto todavía, se carga directo en la base.</li>
+          <li><b>Dominio</b>: conectarlo en Vercel y actualizar <code>APP_URL</code> y el dominio hardcodeado en{' '}
+            <code>src/hooks/useSEO.js</code> y <code>api/sitemap.js</code>.</li>
+        </ol>
+      </ManualSection>
+    </>
+  )
 }
 
 /* ===================== CONTENIDO ===================== */

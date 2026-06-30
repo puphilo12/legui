@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { useStore } from './store/useStore'
 import ScrollToTop from './components/ScrollToTop'
 import Header from './components/Header'
@@ -14,6 +14,7 @@ import Checkout from './pages/Checkout'
 import Admin from './pages/Admin'
 import MiCuenta from './pages/MiCuenta'
 import NotFound from './pages/NotFound'
+import MaintenancePage from './pages/MaintenancePage'
 
 function Splash() {
   return (
@@ -37,11 +38,19 @@ export default function App() {
   const load = useStore((s) => s.load)
   const initAuth = useStore((s) => s.initAuth)
   const ready = useStore((s) => s.ready)
+  const maintenance = useStore((s) => s.settings.maintenance_mode)
+  const location = useLocation()
 
   useEffect(() => {
     load()
     initAuth()
   }, [load, initAuth])
+
+  // El admin sigue funcionando siempre (para poder desactivar el mantenimiento).
+  const isAdminRoute = location.pathname.startsWith('/admin')
+  if (ready && maintenance && !isAdminRoute) {
+    return <MaintenancePage />
+  }
 
   return (
     <>
