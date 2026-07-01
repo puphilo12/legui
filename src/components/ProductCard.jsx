@@ -44,59 +44,15 @@ export default function ProductCard({ product, reveal = true }) {
         </button>
       </Link>
 
-      <Link
-        to={url}
-        style={{
-          padding: '16px 16px 18px',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 12,
-        }}
-      >
+      <Link to={url} className="prod-info">
         <div style={{ minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 11,
-              letterSpacing: '.12em',
-              textTransform: 'uppercase',
-              color: 'var(--faint)',
-              marginBottom: 6,
-            }}
-          >
-            {product.category}
-          </div>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 16,
-              lineHeight: 1.25,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {product.name}
-          </div>
+          <div className="prod-cat">{product.category}</div>
+          <div className="prod-name">{product.name}</div>
           {hasDiscount && (
-            <div
-              style={{
-                fontSize: 13,
-                color: 'var(--faint)',
-                textDecoration: 'line-through',
-                marginTop: 4,
-              }}
-            >
-              {money(product.price)}
-            </div>
+            <div className="prod-old-price">{money(product.price)}</div>
           )}
         </div>
-        <div
-          className="anton"
-          style={{ fontSize: 21, color: 'var(--blue)', whiteSpace: 'nowrap' }}
-        >
-          {money(effPrice(product))}
-        </div>
+        <div className="anton prod-price">{money(effPrice(product))}</div>
       </Link>
     </article>
   )

@@ -406,6 +406,40 @@ label.field {
   background: var(--blue);
   border-color: var(--blue);
 }
+.prod-info {
+  padding: 16px 16px 18px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.prod-cat {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+  margin-bottom: 6px;
+}
+.prod-name {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prod-old-price {
+  font-size: 13px;
+  color: var(--faint);
+  text-decoration: line-through;
+  margin-top: 4px;
+}
+.prod-price {
+  font-size: 21px;
+  color: var(--blue);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 
 /* Grids responsive ------------------------------------------------- */
 .grid-products {
@@ -1004,5 +1038,20 @@ label.field {
   .lookbook-grid {
     grid-template-columns: 1fr 1fr;
     grid-auto-rows: 150px;
+  }
+  .prod-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 12px 12px 14px;
+  }
+  .prod-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+  .prod-price {
+    font-size: 18px;
+    margin-top: 2px;
   }
 }

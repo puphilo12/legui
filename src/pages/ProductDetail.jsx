@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus } from 'lucide-react'
+import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus, Share2 } from 'lucide-react'
 import { useStore, effPrice, variantStock } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
 import { useSEO, SITE_URL } from '../hooks/useSEO'
@@ -98,6 +98,24 @@ export default function ProductDetail() {
     }
     if (variantSoldOut) return
     addToCart(product, { color, size, qty })
+  }
+
+  const share = async () => {
+    const shareUrl = `${SITE_URL}/producto/${slug}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, text: `Mirá ${product.name} en LEGUI`, url: shareUrl })
+      } catch {
+        // usuario canceló, no hacemos nada
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      toast('Link copiado')
+    } catch {
+      toast('No se pudo copiar el link', 'info')
+    }
   }
 
   const infoRows = [
@@ -289,6 +307,14 @@ export default function ProductDetail() {
               }}
             >
               <Heart size={20} fill={fav ? '#fff' : 'none'} />
+            </button>
+            <button
+              className="icon-btn"
+              aria-label="Compartir"
+              onClick={share}
+              style={{ width: 52, height: 52 }}
+            >
+              <Share2 size={20} />
             </button>
           </div>
 
