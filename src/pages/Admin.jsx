@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, Receipt, Wallet, Boxes,
   Image as ImageIcon, ArrowLeft, Plus, Trash2, Upload, RotateCcw,
-  AlertTriangle, CreditCard, ChevronRight, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
-  Wrench, BookOpen,
+  AlertTriangle, CreditCard, ChevronRight, ChevronDown, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
+  Wrench, BookOpen, MapPin, Phone, Mail, MessageSquare, Truck,
 } from 'lucide-react'
 import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS, variantStock } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
@@ -520,39 +520,99 @@ function TabPedidos() {
   const deleteOrder = useStore((s) => s.deleteOrder)
   const STATES = ['Pendiente', 'Pagado', 'Enviado', 'Entregado', 'Cancelado']
   const pm = (id) => PAYMENT_METHODS.find((m) => m.id === id)?.label || id
+  const [openId, setOpenId] = useState(null)
 
   return (
     <>
       <h1 className="anton admin-h">Pedidos</h1>
-      <p className="muted" style={{ marginBottom: 22 }}>Ventas de mostrador y pedidos. {orders.length} en total.</p>
+      <p className="muted" style={{ marginBottom: 22 }}>Ventas de mostrador y pedidos. {orders.length} en total. Tocá un pedido para ver los datos de envío.</p>
       <div className="admin-card" style={{ overflowX: 'auto' }}>
         {orders.length === 0 ? (
           <p className="muted">Todavía no hay pedidos. Cargá una venta en "Vender".</p>
         ) : (
           <table className="admin-table">
-            <thead><tr><th>Fecha</th><th>Cliente</th><th>Detalle</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead>
+            <thead><tr><th></th><th>Fecha</th><th>Cliente</th><th>Detalle</th><th>Pago</th><th>Total</th><th>Estado</th><th></th></tr></thead>
             <tbody>
-              {orders.map((o) => (
-                <tr key={o.id}>
-                  <td style={{ whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleDateString('es-AR')}</td>
-                  <td>{o.customer?.nombre || '—'}</td>
-                  <td style={{ maxWidth: 240 }}>
-                    {(o.items || []).map((i, idx) => (<div key={idx} style={{ fontSize: 13 }}>{i.qty}× {i.name}{i.size ? ` · T${i.size}` : ''}{i.color ? ` · ${i.color}` : ''}</div>))}
-                  </td>
-                  <td>{pm(o.payment_method || o.paymentMethod)}</td>
-                  <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{money(o.total)}</td>
-                  <td>
-                    <select className="admin-input" style={{ padding: '6px 8px', width: 'auto' }} value={o.status} onChange={(e) => updateOrderStatus(o.id, e.target.value)}>
-                      {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </td>
-                  <td>
-                    <button onClick={() => deleteOrder(o.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', color: 'var(--red)' }}>
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {orders.map((o) => {
+                const open = openId === o.id
+                const c = o.customer || {}
+                return (
+                  <Fragment key={o.id}>
+                    <tr onClick={() => setOpenId(open ? null : o.id)} style={{ cursor: 'pointer' }}>
+                      <td style={{ width: 24, color: 'var(--faint)' }}>{open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleDateString('es-AR')}</td>
+                      <td>{c.nombre || '—'}</td>
+                      <td style={{ maxWidth: 240 }}>
+                        {(o.items || []).map((i, idx) => (<div key={idx} style={{ fontSize: 13 }}>{i.qty}× {i.name}{i.size ? ` · T${i.size}` : ''}{i.color ? ` · ${i.color}` : ''}</div>))}
+                      </td>
+                      <td>{pm(o.payment_method || o.paymentMethod)}</td>
+                      <td style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>{money(o.total)}</td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <select className="admin-input" style={{ padding: '6px 8px', width: 'auto' }} value={o.status} onChange={(e) => updateOrderStatus(o.id, e.target.value)}>
+                          {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </td>
+                      <td onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => deleteOrder(o.id)} aria-label="Eliminar" style={{ background: 'none', border: 'none', color: 'var(--red)' }}>
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr>
+                        <td colSpan={8} style={{ background: 'var(--bg-2)', padding: '16px 18px' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 18, fontSize: 13 }}>
+                            <div>
+                              <div style={{ fontSize: 11, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Contacto</div>
+                              {c.telefono && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                  <Phone size={14} style={{ color: 'var(--blue)', flexShrink: 0 }} />
+                                  <a href={`https://wa.me/${c.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ color: 'var(--text)' }}>{c.telefono}</a>
+                                </div>
+                              )}
+                              {c.email && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <Mail size={14} style={{ color: 'var(--blue)', flexShrink: 0 }} />
+                                  <span>{c.email}</span>
+                                </div>
+                              )}
+                              {!c.telefono && !c.email && <span className="muted">Sin datos de contacto.</span>}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 11, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Entrega</div>
+                              {c.entrega === 'retiro' ? (
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                  <MapPin size={14} style={{ color: 'var(--blue)', marginTop: 2, flexShrink: 0 }} />
+                                  <span>Retira en el local</span>
+                                </div>
+                              ) : (c.direccion || c.localidad || c.provincia || c.cp) ? (
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                  <Truck size={14} style={{ color: 'var(--blue)', marginTop: 2, flexShrink: 0 }} />
+                                  <div>
+                                    {c.direccion && <div>{c.direccion}</div>}
+                                    <div className="muted">{[c.localidad, c.provincia].filter(Boolean).join(', ')}{c.cp ? ` (CP ${c.cp})` : ''}</div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="muted">No se cargó dirección de envío.</span>
+                              )}
+                            </div>
+                            {c.notas && (
+                              <div>
+                                <div style={{ fontSize: 11, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Notas</div>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                                  <MessageSquare size={14} style={{ color: 'var(--blue)', marginTop: 2, flexShrink: 0 }} />
+                                  <span>{c.notas}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         )}
