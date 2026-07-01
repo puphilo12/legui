@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, Truck, Store, MessageCircle, Landmark, Wallet, ShieldCheck, Copy, MapPin, User, LogIn } from 'lucide-react'
-import { useStore } from '../store/useStore'
+import { useStore, SURCHARGE } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
@@ -72,6 +72,13 @@ export default function Checkout() {
   const threshold = settings?.free_shipping_threshold || 0
   const freeShip = threshold && subtotal >= threshold
 
+  // Recargo Mercado Pago (comisión): se suma solo si el cliente elige MP
+  const MP_FEE = SURCHARGE.mercadopago || 0
+  const MP_FEE_LABEL = `${(MP_FEE * 100).toLocaleString('es-AR')}%`
+  const isMP = f.paymentMethod === 'mercadopago'
+  const mpFee = isMP ? Math.round(subtotal * MP_FEE) : 0
+  const grandTotal = subtotal + mpFee
+
   const buildWhatsApp = (order) => {
     const phone = (settings?.whatsapp || '').replace(/\D/g, '')
     if (!phone) return null
@@ -101,7 +108,7 @@ export default function Checkout() {
     if (f.entrega === 'envio' && !f.direccion.trim()) return toast('Completá la dirección de envío', 'info')
     setSubmitting(true)
 
-    const res = await placeOrder({ customer: { ...f }, paymentMethod: f.paymentMethod })
+    const res = await placeOrder({ customer: { ...f }, paymentMethod: f.paymentMethod, surcharge: isMP ? MP_FEE : 0 })
     if (!res.ok) {
       setSubmitting(false)
       return toast(res.error || 'No se pudo crear el pedido', 'info')
@@ -123,10 +130,14 @@ export default function Checkout() {
     // Mercado Pago: crear preferencia y redirigir
     if (f.paymentMethod === 'mercadopago') {
       try {
+        // El recargo va como ítem aparte para que el cliente lo vea desglosado en MP
+        const mpItems = mpFee
+          ? [...cart, { id: 'recargo-mp', name: `Recargo Mercado Pago (${MP_FEE_LABEL})`, price: mpFee, qty: 1 }]
+          : cart
         const mpRes = await fetch('/api/mp-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: cart, customer: f, external_reference: res.order.id }),
+          body: JSON.stringify({ items: mpItems, customer: f, external_reference: res.order.id }),
         })
         const mpData = await mpRes.json()
         if (!mpRes.ok) throw new Error(mpData.error || 'Error MP')
@@ -209,7 +220,7 @@ export default function Checkout() {
   }
 
   const PAYS = [
-    { id: 'mercadopago', icon: null, label: 'Mercado Pago', desc: 'Tarjetas, débito y dinero en cuenta. Pago 100% seguro.' },
+    { id: 'mercadopago', icon: null, label: 'Mercado Pago', desc: `Tarjetas, débito y dinero en cuenta. Suma ${MP_FEE_LABEL} de recargo (comisión MP).` },
     { id: 'transferencia', icon: Landmark, label: 'Transferencia bancaria', desc: settings.alias ? `Alias: ${settings.alias}` : 'Te pasamos los datos bancarios.' },
     { id: 'efectivo', icon: Wallet, label: 'Efectivo', desc: 'Pagás al retirar o al recibir.' },
     { id: 'whatsapp', icon: MessageCircle, label: 'Coordinar por WhatsApp', desc: 'Te escribimos para cerrar pago y envío.' },
@@ -372,17 +383,18 @@ export default function Checkout() {
             </div>
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
               <Row label="Subtotal" value={money(subtotal)} />
+              {mpFee > 0 && <Row label={`Recargo Mercado Pago (${MP_FEE_LABEL})`} value={'+' + money(mpFee)} />}
               <Row label="Envío" value={freeShip ? 'Gratis' : 'A coordinar'} accent={freeShip} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 }}>
                 <span style={{ fontWeight: 600 }}>Total</span>
-                <span className="anton" style={{ fontSize: 28 }}>{money(subtotal)}</span>
+                <span className="anton" style={{ fontSize: 28 }}>{money(grandTotal)}</span>
               </div>
             </div>
             <button type="submit" className="btn btn-blue btn-block" style={{ marginTop: 16 }} disabled={submitting}>
               {submitting
                 ? 'Procesando…'
-                : f.paymentMethod === 'mercadopago'
-                  ? 'Ir a Mercado Pago →'
+                : isMP
+                  ? `Pagar ${money(grandTotal)} con Mercado Pago (incluye +${MP_FEE_LABEL}) →`
                   : 'Confirmar pedido'}
             </button>
             <p style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 12 }}>

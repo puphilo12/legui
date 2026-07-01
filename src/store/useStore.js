@@ -33,8 +33,8 @@ export const SURCHARGE = {
   transferencia: 0,
   debito: 0.1,
   credito: 0.26,
-  'cuenta-corriente': 0.1,
-  mercadopago: 0,
+  'cuenta-corriente': 0.1, // default; en el POS se puede elegir otro %
+  mercadopago: 0.295, // comisión Mercado Pago
 }
 
 export const PAYMENT_METHODS = [
@@ -544,12 +544,12 @@ export const useStore = create((set, get) => ({
   // ------------------------------------------------------------------
   // POS: ventas manuales (mostrador)
   // ------------------------------------------------------------------
-  registerSale({ productId, size = null, color = null, quantity = 1, paymentMethod = 'efectivo', customerName = '', customerDni = '' }) {
+  registerSale({ productId, size = null, color = null, quantity = 1, paymentMethod = 'efectivo', customerName = '', customerDni = '', surchargePercent = null }) {
     const product = get().products.find((p) => p.id === productId)
     if (!product) return { ok: false, error: 'Producto no encontrado' }
 
     const unit = effPrice(product)
-    const surcharge = SURCHARGE[paymentMethod] || 0
+    const surcharge = surchargePercent != null ? Number(surchargePercent) / 100 : (SURCHARGE[paymentMethod] || 0)
     const total = Math.round(unit * quantity * (1 + surcharge))
     const newMatrix = decrementVariant(product.stock_matrix, color, size, quantity)
     const newStock = newMatrix !== product.stock_matrix ? matrixTotal(newMatrix) : Math.max(0, (product.stock ?? 0) - quantity)
@@ -594,11 +594,12 @@ export const useStore = create((set, get) => ({
   },
 
   // Pedido desde el carrito (checkout web)
-  async placeOrder({ customer = {}, paymentMethod = 'whatsapp', channel = 'web' } = {}) {
+  async placeOrder({ customer = {}, paymentMethod = 'whatsapp', channel = 'web', surcharge = 0 } = {}) {
     const { cart, products, user } = get()
     if (!cart.length) return { ok: false, error: 'El carrito está vacío' }
 
-    const total = cart.reduce((n, i) => n + i.price * i.qty, 0)
+    const subtotal = cart.reduce((n, i) => n + i.price * i.qty, 0)
+    const total = Math.round(subtotal * (1 + surcharge))
     // El stock queda reservado mientras el pedido está "Pendiente". Pasado el plazo
     // sin confirmarse, el cron (api/cancel-expired-orders.js) lo cancela y devuelve
     // el stock. Mercado Pago se confirma solo (webhook, ver api/mp-webhook.js) así

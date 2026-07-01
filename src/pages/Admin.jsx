@@ -399,13 +399,13 @@ function TabVentas() {
   const orders = useStore((s) => s.orders)
   const registerSale = useStore((s) => s.registerSale)
   const toast = useStore((s) => s.toast)
-  const empty = { productId: '', size: '', color: '', quantity: 1, paymentMethod: 'efectivo', customerName: '', customerDni: '' }
+  const empty = { productId: '', size: '', color: '', quantity: 1, paymentMethod: 'efectivo', customerName: '', customerDni: '', ccPercent: Math.round(SURCHARGE['cuenta-corriente'] * 100) }
   const [f, setF] = useState(empty)
   const product = products.find((p) => p.id === f.productId)
-  const surcharge = SURCHARGE[f.paymentMethod] || 0
+  const isCC = f.paymentMethod === 'cuenta-corriente'
+  const surcharge = isCC ? (Number(f.ccPercent) || 0) / 100 : (SURCHARGE[f.paymentMethod] || 0)
   const unit = product ? effPrice(product) : 0
   const total = Math.round(unit * (Number(f.quantity) || 1) * (1 + surcharge))
-  const isCC = f.paymentMethod === 'cuenta-corriente'
   const set = (patch) => setF((s) => ({ ...s, ...patch }))
 
   const submit = (e) => {
@@ -413,7 +413,7 @@ function TabVentas() {
     if (!product) return toast('Elegí un producto', 'info')
     if ((product.sizes || []).length && !f.size) return toast('Elegí un talle', 'info')
     if (isCC && !f.customerDni.trim()) return toast('Para fiado cargá el DNI del cliente', 'info')
-    const r = registerSale({ productId: f.productId, size: f.size || null, color: f.color || null, quantity: Number(f.quantity) || 1, paymentMethod: f.paymentMethod, customerName: f.customerName, customerDni: f.customerDni })
+    const r = registerSale({ productId: f.productId, size: f.size || null, color: f.color || null, quantity: Number(f.quantity) || 1, paymentMethod: f.paymentMethod, customerName: f.customerName, customerDni: f.customerDni, surchargePercent: isCC ? Number(f.ccPercent) || 0 : null })
     if (r.ok) setF(empty)
   }
 
@@ -473,7 +473,7 @@ function TabVentas() {
             <div style={{ flex: 1 }}>
               <label className="admin-label">Medio de pago</label>
               <select className="admin-input" value={f.paymentMethod} onChange={(e) => set({ paymentMethod: e.target.value })}>
-                {PAYMENT_METHODS.map((m) => (<option key={m.id} value={m.id}>{m.icon} {m.label}{SURCHARGE[m.id] ? ` (+${Math.round(SURCHARGE[m.id] * 100)}%)` : ''}</option>))}
+                {PAYMENT_METHODS.map((m) => (<option key={m.id} value={m.id}>{m.icon} {m.label}{SURCHARGE[m.id] ? ` (+${(SURCHARGE[m.id] * 100).toLocaleString('es-AR')}%)` : ''}</option>))}
               </select>
             </div>
           </div>
@@ -487,6 +487,10 @@ function TabVentas() {
                 <label className="admin-label">DNI</label>
                 <input className="admin-input" placeholder="DNI" value={f.customerDni} onChange={(e) => set({ customerDni: e.target.value })} />
               </div>
+              <div style={{ width: 110 }}>
+                <label className="admin-label">Recargo %</label>
+                <input type="number" min="0" max="200" step="0.5" className="admin-input" value={f.ccPercent} onChange={(e) => set({ ccPercent: e.target.value })} />
+              </div>
             </div>
           )}
           <button className="btn btn-blue btn-block" type="submit" style={{ marginTop: 6 }}>
@@ -496,7 +500,7 @@ function TabVentas() {
         <div className="admin-card">
           <div className="stat-label">A cobrar</div>
           <div className="anton" style={{ fontSize: 40, color: 'var(--blue)', margin: '6px 0 4px' }}>{money(total)}</div>
-          {surcharge > 0 && <div className="stat-hint">Incluye recargo +{Math.round(surcharge * 100)}% ({money(total - unit * (Number(f.quantity) || 1))})</div>}
+          {surcharge > 0 && <div className="stat-hint">Incluye recargo +{(surcharge * 100).toLocaleString('es-AR')}% ({money(total - unit * (Number(f.quantity) || 1))})</div>}
           <div style={{ borderTop: '1px solid var(--line)', margin: '16px 0', paddingTop: 14 }}>
             <div className="stat-label" style={{ marginBottom: 8 }}>Ventas de hoy ({todaySales.length})</div>
             {todaySales.slice(0, 6).map((o) => (
