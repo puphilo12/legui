@@ -270,7 +270,16 @@ function TabResumen({ go }) {
     const m = thisMonth()
     const paid = orders.filter((o) => o.status === 'Pagado')
     const sum = (arr) => arr.reduce((n, o) => n + (o.total || 0), 0)
-    const profit = (arr) => arr.reduce((n, o) => n + (o.items || []).reduce((a, i) => a + ((i.price || 0) - (i.cost || 0)) * (i.qty || 1), 0), 0)
+    // Ganancia = lo realmente cobrado (o.total, ya con descuento/recargo) − costo.
+    // Si el ítem no tiene costo grabado (se cargó después de la venta), usamos
+    // el costo actual del producto.
+    const profit = (arr) => arr.reduce((n, o) => {
+      const cost = (o.items || []).reduce((a, i) => {
+        const c = Number(i.cost) || Number(products.find((p) => p.id === i.id)?.cost || 0)
+        return a + c * (i.qty || 1)
+      }, 0)
+      return n + (o.total || 0) - cost
+    }, 0)
     const salesToday = sum(paid.filter((o) => (o.created_at || '').slice(0, 10) === t))
     const monthPaid = paid.filter((o) => monthOf(o.created_at) === m)
     const salesMonth = sum(monthPaid)
@@ -279,7 +288,7 @@ function TabResumen({ go }) {
     const ccTotal = customers.reduce((n, c) => n + (c.balance || 0), 0)
     const cobranzas = customers.reduce((n, c) => n + (c.history || []).filter((h) => h.type === 'pago' && monthOf(h.date) === m).reduce((a, h) => a + (h.amount || 0), 0), 0)
     return { salesToday, salesMonth, profitMonth, expMonth, ccTotal, cobranzas }
-  }, [orders, expenses, customers])
+  }, [orders, expenses, customers, products])
 
   const crit = products.filter(isCrit)
 
