@@ -473,7 +473,11 @@ function TabVentas() {
             <div style={{ flex: 1 }}>
               <label className="admin-label">Medio de pago</label>
               <select className="admin-input" value={f.paymentMethod} onChange={(e) => set({ paymentMethod: e.target.value })}>
-                {PAYMENT_METHODS.map((m) => (<option key={m.id} value={m.id}>{m.icon} {m.label}{SURCHARGE[m.id] ? ` (+${(SURCHARGE[m.id] * 100).toLocaleString('es-AR')}%)` : ''}</option>))}
+                {PAYMENT_METHODS.map((m) => {
+                  const pct = (SURCHARGE[m.id] || 0) * 100
+                  const tag = pct > 0 ? ` (+${pct.toLocaleString('es-AR')}%)` : pct < 0 ? ` (${Math.abs(pct).toLocaleString('es-AR')}% OFF)` : ''
+                  return (<option key={m.id} value={m.id}>{m.icon} {m.label}{tag}</option>)
+                })}
               </select>
             </div>
           </div>
@@ -501,6 +505,7 @@ function TabVentas() {
           <div className="stat-label">A cobrar</div>
           <div className="anton" style={{ fontSize: 40, color: 'var(--blue)', margin: '6px 0 4px' }}>{money(total)}</div>
           {surcharge > 0 && <div className="stat-hint">Incluye recargo +{(surcharge * 100).toLocaleString('es-AR')}% ({money(total - unit * (Number(f.quantity) || 1))})</div>}
+          {surcharge < 0 && <div className="stat-hint" style={{ color: 'var(--green)' }}>Incluye {Math.abs(surcharge * 100).toLocaleString('es-AR')}% OFF (-{money(unit * (Number(f.quantity) || 1) - total)})</div>}
           <div style={{ borderTop: '1px solid var(--line)', margin: '16px 0', paddingTop: 14 }}>
             <div className="stat-label" style={{ marginBottom: 8 }}>Ventas de hoy ({todaySales.length})</div>
             {todaySales.slice(0, 6).map((o) => (

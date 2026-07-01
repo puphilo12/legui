@@ -28,13 +28,17 @@ const LS = {
   stock: `legui_stock_${STORE_ID}`,
 }
 
+// El precio de catálogo ES el precio final con Mercado Pago.
+// Pagando por transferencia, efectivo o WhatsApp hay descuento.
+export const CASH_DISCOUNT = 0.3
+
 export const SURCHARGE = {
-  efectivo: 0,
-  transferencia: 0,
+  efectivo: -CASH_DISCOUNT,
+  transferencia: -CASH_DISCOUNT,
   debito: 0.1,
   credito: 0.26,
   'cuenta-corriente': 0.1, // default; en el POS se puede elegir otro %
-  mercadopago: 0.295, // comisión Mercado Pago
+  mercadopago: 0, // el precio de lista ya es el precio MP
 }
 
 export const PAYMENT_METHODS = [

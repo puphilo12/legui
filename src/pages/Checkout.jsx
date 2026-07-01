@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, Truck, Store, MessageCircle, Landmark, Wallet, ShieldCheck, Copy, MapPin, User, LogIn } from 'lucide-react'
-import { useStore, SURCHARGE } from '../store/useStore'
+import { useStore, CASH_DISCOUNT } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
@@ -72,12 +72,12 @@ export default function Checkout() {
   const threshold = settings?.free_shipping_threshold || 0
   const freeShip = threshold && subtotal >= threshold
 
-  // Recargo Mercado Pago (comisión): se suma solo si el cliente elige MP
-  const MP_FEE = SURCHARGE.mercadopago || 0
-  const MP_FEE_LABEL = `${(MP_FEE * 100).toLocaleString('es-AR')}%`
-  const isMP = f.paymentMethod === 'mercadopago'
-  const mpFee = isMP ? Math.round(subtotal * MP_FEE) : 0
-  const grandTotal = subtotal + mpFee
+  // El precio de lista ya es el precio final con Mercado Pago.
+  // Transferencia, efectivo y WhatsApp llevan descuento.
+  const DISCOUNT_LABEL = `${(CASH_DISCOUNT * 100).toLocaleString('es-AR')}%`
+  const hasDiscount = ['transferencia', 'efectivo', 'whatsapp'].includes(f.paymentMethod)
+  const discount = hasDiscount ? Math.round(subtotal * CASH_DISCOUNT) : 0
+  const grandTotal = subtotal - discount
 
   const buildWhatsApp = (order) => {
     const phone = (settings?.whatsapp || '').replace(/\D/g, '')
@@ -93,12 +93,18 @@ export default function Checkout() {
     const entrega = c.entrega === 'retiro'
       ? `Retiro en local${settings?.showroom_address ? ' — ' + settings.showroom_address : ''}`
       : `Envío a: ${c.direccion}, ${c.localidad}${c.provincia ? ', ' + c.provincia : ''}${c.cp ? ' (CP ' + c.cp + ')' : ''}`
+    const method = order.payment_method || order.paymentMethod
+    const orderSubtotal = order.items.reduce((n, i) => n + i.price * i.qty, 0)
+    const orderDiscount = orderSubtotal - order.total
+    const totales = orderDiscount > 0
+      ? `Subtotal: ${money(orderSubtotal)}\nDescuento ${DISCOUNT_LABEL} OFF (${PAY_LABEL[method] || method}): -${money(orderDiscount)}\nTotal: ${money(order.total)}`
+      : `Total: ${money(order.total)}`
     const msg =
       `Hola LEGUI! 👋 Nuevo pedido #${order.id.slice(-5)}\n\n` +
       `Cliente: ${c.nombre}\nTel: ${c.telefono}${c.email ? '\nEmail: ' + c.email : ''}\n${entrega}\n` +
       (c.notas ? `Notas: ${c.notas}\n` : '') +
-      `\n${lines.join('\n')}\n\nTotal: ${money(order.total)}\nPago: ${PAY_LABEL[order.payment_method || order.paymentMethod] || 'A coordinar'}` +
-      (order.payment_method === 'transferencia' || order.paymentMethod === 'transferencia' ? `\n\nApenas transfiera te envío el comprobante 📎` : '')
+      `\n${lines.join('\n')}\n\n${totales}\nPago: ${PAY_LABEL[method] || 'A coordinar'}` +
+      (method === 'transferencia' ? `\n\nApenas transfiera te envío el comprobante 📎` : '')
     return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
   }
 
@@ -108,7 +114,7 @@ export default function Checkout() {
     if (f.entrega === 'envio' && !f.direccion.trim()) return toast('Completá la dirección de envío', 'info')
     setSubmitting(true)
 
-    const res = await placeOrder({ customer: { ...f }, paymentMethod: f.paymentMethod, surcharge: isMP ? MP_FEE : 0 })
+    const res = await placeOrder({ customer: { ...f }, paymentMethod: f.paymentMethod, surcharge: hasDiscount ? -CASH_DISCOUNT : 0 })
     if (!res.ok) {
       setSubmitting(false)
       return toast(res.error || 'No se pudo crear el pedido', 'info')
@@ -130,14 +136,10 @@ export default function Checkout() {
     // Mercado Pago: crear preferencia y redirigir
     if (f.paymentMethod === 'mercadopago') {
       try {
-        // El recargo va como ítem aparte para que el cliente lo vea desglosado en MP
-        const mpItems = mpFee
-          ? [...cart, { id: 'recargo-mp', name: `Recargo Mercado Pago (${MP_FEE_LABEL})`, price: mpFee, qty: 1 }]
-          : cart
         const mpRes = await fetch('/api/mp-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: mpItems, customer: f, external_reference: res.order.id }),
+          body: JSON.stringify({ items: cart, customer: f, external_reference: res.order.id }),
         })
         const mpData = await mpRes.json()
         if (!mpRes.ok) throw new Error(mpData.error || 'Error MP')
@@ -220,10 +222,10 @@ export default function Checkout() {
   }
 
   const PAYS = [
-    { id: 'mercadopago', icon: null, label: 'Mercado Pago', desc: `Tarjetas, débito y dinero en cuenta. Suma ${MP_FEE_LABEL} de recargo (comisión MP).` },
-    { id: 'transferencia', icon: Landmark, label: 'Transferencia bancaria', desc: settings.alias ? `Alias: ${settings.alias}` : 'Te pasamos los datos bancarios.' },
-    { id: 'efectivo', icon: Wallet, label: 'Efectivo', desc: 'Pagás al retirar o al recibir.' },
-    { id: 'whatsapp', icon: MessageCircle, label: 'Coordinar por WhatsApp', desc: 'Te escribimos para cerrar pago y envío.' },
+    { id: 'mercadopago', icon: null, label: 'Mercado Pago', desc: 'Tarjetas, débito y dinero en cuenta. Pago 100% seguro.' },
+    { id: 'transferencia', icon: Landmark, label: `Transferencia bancaria · ${DISCOUNT_LABEL} OFF`, desc: settings.alias ? `Alias: ${settings.alias}` : 'Te pasamos los datos bancarios.' },
+    { id: 'efectivo', icon: Wallet, label: `Efectivo · ${DISCOUNT_LABEL} OFF`, desc: 'Pagás al retirar o al recibir.' },
+    { id: 'whatsapp', icon: MessageCircle, label: `Coordinar por WhatsApp · ${DISCOUNT_LABEL} OFF`, desc: 'Te escribimos para cerrar pago y envío.' },
   ]
 
   return (
@@ -383,7 +385,7 @@ export default function Checkout() {
             </div>
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
               <Row label="Subtotal" value={money(subtotal)} />
-              {mpFee > 0 && <Row label={`Recargo Mercado Pago (${MP_FEE_LABEL})`} value={'+' + money(mpFee)} />}
+              {discount > 0 && <Row label={`Descuento ${DISCOUNT_LABEL} OFF`} value={'-' + money(discount)} accent />}
               <Row label="Envío" value={freeShip ? 'Gratis' : 'A coordinar'} accent={freeShip} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 }}>
                 <span style={{ fontWeight: 600 }}>Total</span>
@@ -393,9 +395,9 @@ export default function Checkout() {
             <button type="submit" className="btn btn-blue btn-block" style={{ marginTop: 16 }} disabled={submitting}>
               {submitting
                 ? 'Procesando…'
-                : isMP
-                  ? `Pagar ${money(grandTotal)} con Mercado Pago (incluye +${MP_FEE_LABEL}) →`
-                  : 'Confirmar pedido'}
+                : f.paymentMethod === 'mercadopago'
+                  ? `Pagar ${money(grandTotal)} con Mercado Pago →`
+                  : `Confirmar pedido · ${money(grandTotal)}`}
             </button>
             <p style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center', fontSize: 12, color: 'var(--faint)', marginTop: 12 }}>
               <ShieldCheck size={14} /> Tus datos están protegidos
