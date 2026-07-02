@@ -1,4 +1,5 @@
 import { restoreStock } from './_lib/restoreStock.js'
+import { sendOrderStatusEmail } from './_lib/orderStatusEmail.js'
 
 const STATUS_MAP = {
   approved: 'Pagado',
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
     // stock dos veces si MP reenvía el mismo webhook) e items (para devolver
     // stock si se rechaza).
     const orderRes = await fetch(
-      `${process.env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=status,items`,
+      `${process.env.SUPABASE_URL}/rest/v1/orders?id=eq.${orderId}&select=status,items,customer,total,payment_method`,
       { headers: sbHeaders }
     )
     const orderRows = await orderRes.json()
@@ -64,6 +65,12 @@ export default async function handler(req, res) {
     // — no hace falta esperar las 48hs si ya sabemos que no se va a pagar.
     if (newStatus === 'Cancelado' && order.status !== 'Cancelado') {
       await restoreStock(order.items)
+    }
+
+    // 5. Avisar al cliente por email, solo en el cambio de estado real (evita
+    // reenviar si MP retransmite el mismo webhook).
+    if (order.status !== newStatus && (newStatus === 'Pagado' || newStatus === 'Cancelado')) {
+      await sendOrderStatusEmail({ id: orderId, ...order }, newStatus)
     }
 
     return res.status(200).json({ ok: true })

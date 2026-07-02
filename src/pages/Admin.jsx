@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Receipt, Wallet, Boxes,
   Image as ImageIcon, ArrowLeft, Plus, Trash2, Upload, RotateCcw,
   AlertTriangle, CreditCard, ChevronRight, ChevronDown, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
-  Wrench, BookOpen, MapPin, Phone, Mail, MessageSquare, Truck,
+  Wrench, BookOpen, MapPin, Phone, Mail, MessageSquare, Truck, Send,
 } from 'lucide-react'
 import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS, variantStock } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
@@ -1292,6 +1292,24 @@ function DropsManager() {
   const addDrop = useStore((s) => s.addDrop)
   const updateDrop = useStore((s) => s.updateDrop)
   const deleteDrop = useStore((s) => s.deleteDrop)
+  const toast = useStore((s) => s.toast)
+  const [sendingId, setSendingId] = useState(null)
+
+  const sendAlert = async (d) => {
+    if (MOCK) return toast('Necesitás estar conectado a Supabase para enviar avisos', 'info')
+    setSendingId(d.id)
+    try {
+      const r = await fetch('/api/notify-drop', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: d.title, subtitle: d.subtitle, discount: d.discount }),
+      })
+      const data = await r.json()
+      toast(data.sent ? `Aviso enviado a ${data.sent} cliente${data.sent === 1 ? '' : 's'}` : 'No hay clientes registrados todavía', data.sent ? 'ok' : 'info')
+    } catch {
+      toast('No se pudo enviar el aviso', 'error')
+    }
+    setSendingId(null)
+  }
 
   return (
     <>
@@ -1325,7 +1343,10 @@ function DropsManager() {
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
               <TogglePill on={d.active} onClick={() => updateDrop(d.id, { active: !d.active })}>{d.active ? 'Activo' : 'Inactivo'}</TogglePill>
-              <button onClick={() => deleteDrop(d.id)} aria-label="Eliminar" style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--line-2)', color: 'var(--red)', width: 34, height: 34, borderRadius: 8 }}><Trash2 size={15} /></button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => sendAlert(d)} disabled={sendingId === d.id} style={{ marginLeft: 'auto' }}>
+                <Send size={13} /> {sendingId === d.id ? 'Enviando…' : 'Avisar a clientes'}
+              </button>
+              <button onClick={() => deleteDrop(d.id)} aria-label="Eliminar" style={{ background: 'none', border: '1px solid var(--line-2)', color: 'var(--red)', width: 34, height: 34, borderRadius: 8, flexShrink: 0 }}><Trash2 size={15} /></button>
             </div>
           </div>
         ))}

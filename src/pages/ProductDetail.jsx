@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus, Share2 } from 'lucide-react'
+import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus, Share2, Bell, Check } from 'lucide-react'
 import { useStore, effPrice, variantStock } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
 import { useSEO, SITE_URL } from '../hooks/useSEO'
 import { money } from '../utils/format'
+import { supabase, MOCK, STORE_ID } from '../lib/supabase'
 import ProductCard from '../components/ProductCard'
 import SizeGuide from '../components/SizeGuide'
 
@@ -26,6 +27,9 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1)
   const [mainImg, setMainImg] = useState('')
   const [guide, setGuide] = useState(false)
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistSent, setWaitlistSent] = useState(false)
+  const [waitlistBusy, setWaitlistBusy] = useState(false)
 
   const gallery = useMemo(() => {
     if (!product) return []
@@ -39,6 +43,8 @@ export default function ProductDetail() {
     setSize(null)
     setQty(1)
     setMainImg(def?.images?.[0] || product?.images?.[0] || product?.image || '')
+    setWaitlistEmail('')
+    setWaitlistSent(false)
   }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setQty(1) }, [color, size])
@@ -116,6 +122,19 @@ export default function ProductDetail() {
     } catch {
       toast('No se pudo copiar el link', 'info')
     }
+  }
+
+  const joinWaitlist = async (e) => {
+    e.preventDefault()
+    if (!waitlistEmail.trim()) return
+    if (MOCK) { setWaitlistSent(true); return }
+    setWaitlistBusy(true)
+    const { error } = await supabase.from('product_waitlist').insert({
+      store_id: STORE_ID, product_id: product.id, product_name: product.name, email: waitlistEmail.trim(),
+    })
+    setWaitlistBusy(false)
+    if (error) { toast('No se pudo guardar tu email, intentá de nuevo', 'error'); return }
+    setWaitlistSent(true)
   }
 
   const infoRows = [
@@ -322,6 +341,32 @@ export default function ProductDetail() {
             <p style={{ color: 'var(--amber)', fontSize: 13, fontWeight: 600, marginBottom: 20 }}>
               ¡Últimas {stock} unidades!
             </p>
+          )}
+
+          {(soldOut || variantSoldOut) && (
+            <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--bg-2)', border: '1px solid var(--line)', marginBottom: 20 }}>
+              {waitlistSent ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--green)' }}>
+                  <Check size={16} /> Te vamos a avisar por email apenas vuelva a tener stock.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, marginBottom: 10 }}>
+                    <Bell size={15} style={{ color: 'var(--blue)' }} /> Avisame cuando llegue
+                  </div>
+                  <form onSubmit={joinWaitlist} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <input
+                      type="email" required placeholder="tu@email.com" className="input"
+                      style={{ flex: 1, minWidth: 160 }}
+                      value={waitlistEmail} onChange={(e) => setWaitlistEmail(e.target.value)}
+                    />
+                    <button type="submit" className="btn btn-blue btn-sm" disabled={waitlistBusy}>
+                      {waitlistBusy ? 'Enviando…' : 'Avisame'}
+                    </button>
+                  </form>
+                </>
+              )}
+            </div>
           )}
 
           {/* info envíos */}

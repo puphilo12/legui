@@ -115,6 +115,13 @@ const sbDebounce = (map, key, delay, fn) => {
   map[key] = setTimeout(() => fn().catch((e) => console.error('sb debounce:', e)), delay)
 }
 
+// Dispara un email transaccional (fire-and-forget, nunca bloquea la UI ni el flujo si falla)
+const notify = (path, body) => {
+  if (MOCK) return
+  fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .catch((e) => console.error(`notify ${path}:`, e))
+}
+
 export const useStore = create((set, get) => ({
   // ---- datos ----
   ready: false,
@@ -420,11 +427,19 @@ export const useStore = create((set, get) => ({
   // Productos — CRUD
   // ------------------------------------------------------------------
   updateProduct(id, patch) {
+    const prev = get().products.find((p) => p.id === id)
+    const wasOut = !!(prev && (prev.sold_out || (prev.stock ?? 0) <= 0))
+    const merged = { ...prev, ...patch }
+    const backInStock = wasOut && !merged.sold_out && (merged.stock ?? 0) > 0
+
     set((s) => {
       const products = s.products.map((p) => p.id === id ? { ...p, ...patch } : p)
       write(LS.products, products)
       return { products }
     })
+    if (backInStock) {
+      notify('/api/notify-waitlist', { productId: id, productName: merged.name, price: effPrice(merged), slug: slugify(merged.name || '') })
+    }
     // Los borradores (recién creados, todavía no guardados) no existen en Supabase:
     // no hay nada que actualizar ahí hasta que se confirme la creación.
     if (get().products.find((p) => p.id === id)?._draft) return
@@ -592,6 +607,7 @@ export const useStore = create((set, get) => ({
         if (c) await supabase.from('customers').upsert({ ...c, store_id: STORE_ID })
       }
     })
+    notify('/api/notify-owner-sale', { order })
 
     get().toast('Venta registrada')
     return { ok: true, total }
@@ -653,6 +669,7 @@ export const useStore = create((set, get) => ({
       if (user?.id && !get().isAdmin) {
         set((s) => ({ buyerOrders: [order, ...s.buyerOrders] }))
       }
+      notify('/api/notify-owner-sale', { order })
     }
 
     return { ok: true, order, total }
@@ -662,6 +679,7 @@ export const useStore = create((set, get) => ({
     const order = get().orders.find((o) => o.id === id)
     // Si se cancela un pedido que no estaba ya cancelado, devolvemos el stock reservado.
     const restoring = status === 'Cancelado' && order && order.status !== 'Cancelado'
+    const statusChanged = order && order.status !== status && ['Pagado', 'Enviado', 'Entregado', 'Cancelado'].includes(status)
 
     set((s) => {
       let products = s.products
@@ -694,6 +712,7 @@ export const useStore = create((set, get) => ({
         }
       }
     })
+    if (statusChanged) notify('/api/notify-order-status', { order: { ...order, status }, status })
   },
   deleteOrder(id) {
     set((s) => { const orders = s.orders.filter((o) => o.id !== id); write(LS.orders, orders); return { orders } })

@@ -66,7 +66,12 @@ function BuyerLogin() {
     const res = await fn(email.trim(), password)
     setLoading(false)
     if (!res.ok) toast(res.error || 'Error de autenticación', 'error')
-    else if (mode === 'register') toast('¡Cuenta creada! Revisá tu email para confirmar.', 'info')
+    else if (mode === 'register') {
+      toast('¡Cuenta creada! Revisá tu email para confirmar.', 'info')
+      if (!MOCK) {
+        fetch('/api/notify-welcome', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) }).catch(() => {})
+      }
+    }
   }
 
   const TITLES = {
