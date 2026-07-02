@@ -25,3 +25,6 @@ pnpm-debug.log*
 .idea
 .DS_Store
 Thumbs.db
+
+# CLI de Supabase (estado local del login/link, no es del proyecto)
+supabase/.temp
