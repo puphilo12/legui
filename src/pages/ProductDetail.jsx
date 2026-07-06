@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Heart, Ruler, Truck, RefreshCw, ShieldCheck, Minus, Plus, Share2, Bell, Check } from 'lucide-react'
-import { useStore, effPrice, variantStock } from '../store/useStore'
+import { useStore, effPrice, variantStock, CASH_DISCOUNT } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
 import { useSEO, SITE_URL } from '../hooks/useSEO'
 import { money } from '../utils/format'
 import { supabase, MOCK, STORE_ID } from '../lib/supabase'
 import ProductCard from '../components/ProductCard'
+import Img from '../components/Img'
 import SizeGuide from '../components/SizeGuide'
 
 export default function ProductDetail() {
@@ -18,6 +19,7 @@ export default function ProductDetail() {
   const toast = useStore((s) => s.toast)
   const favorites = useStore((s) => s.favorites)
   const toggleFav = useStore((s) => s.toggleFav)
+  const joinWaitlistLocal = useStore((s) => s.joinWaitlistLocal)
 
   const product = useMemo(() => getProduct(slug), [slug, products, getProduct])
   const related = useMemo(() => relatedFn(product), [product, relatedFn])
@@ -90,6 +92,7 @@ export default function ProductDetail() {
   const hasDiscount = product.discount_price && product.discount_price < product.price
   const off = hasDiscount ? Math.round((1 - product.discount_price / product.price) * 100) : 0
   const soldOut = product.sold_out || (product.stock ?? 0) <= 0
+  const cashPrice = Math.round(effPrice(product) * (1 - CASH_DISCOUNT))
   const needSize = (product.sizes || []).length > 0
   const selStock = variantStock(product, color, size)
   const variantSoldOut = size !== null && selStock !== null && selStock <= 0
@@ -127,7 +130,7 @@ export default function ProductDetail() {
   const joinWaitlist = async (e) => {
     e.preventDefault()
     if (!waitlistEmail.trim()) return
-    if (MOCK) { setWaitlistSent(true); return }
+    if (MOCK) { joinWaitlistLocal(product.id, product.name, waitlistEmail.trim()); setWaitlistSent(true); return }
     setWaitlistBusy(true)
     const { error } = await supabase.from('product_waitlist').insert({
       store_id: STORE_ID, product_id: product.id, product_name: product.name, email: waitlistEmail.trim(),
@@ -165,13 +168,11 @@ export default function ProductDetail() {
               aspectRatio: '4 / 5',
             }}
           >
-            <img src={mainImg} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            {/* Imagen principal en resolución original: acá la gente mira el detalle
+                de la zapatilla de cerca, así que priorizamos nitidez sobre peso. */}
+            <Img src={mainImg} alt={product.name} priority style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             {hasDiscount && !soldOut && <span className="off-badge" style={{ fontSize: 12 }}>-{off}%</span>}
-            {soldOut && (
-              <div className="soldout-overlay">
-                <span>Agotado</span>
-              </div>
-            )}
+            {soldOut && <span className="soldout-badge lg">Agotado</span>}
           </div>
 
           {gallery.length > 1 && (
@@ -191,7 +192,7 @@ export default function ProductDetail() {
                     cursor: 'pointer',
                   }}
                 >
-                  <img src={img} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <Img src={img} alt="" w={80} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </button>
               ))}
             </div>
@@ -207,7 +208,7 @@ export default function ProductDetail() {
             {product.name}
           </h1>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
             <span className="anton" style={{ fontSize: 34, color: 'var(--blue)' }}>
               {money(effPrice(product))}
             </span>
@@ -230,6 +231,13 @@ export default function ProductDetail() {
                 </span>
               </>
             )}
+          </div>
+
+          {/* Precio real pagando en efectivo o transferencia (30% OFF sobre el de lista/MP) */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: 'rgba(52,210,123,.10)', border: '1px solid rgba(52,210,123,.28)', color: 'var(--green)', borderRadius: 12, padding: '10px 14px', marginBottom: 24, fontSize: 14 }}>
+            <span>💵 Efectivo o transferencia</span>
+            <b className="anton" style={{ fontSize: 20 }}>{money(cashPrice)}</b>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', color: '#0a0a0b', background: 'var(--green)', padding: '3px 8px', borderRadius: 999 }}>30% OFF</span>
           </div>
 
           {product.description && (
@@ -352,7 +360,7 @@ export default function ProductDetail() {
               ) : (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 600, fontSize: 13, marginBottom: 10 }}>
-                    <Bell size={15} style={{ color: 'var(--blue)' }} /> Avisame cuando llegue
+                    <Bell size={15} style={{ color: 'var(--blue)' }} /> Avisame cuando ingrese
                   </div>
                   <form onSubmit={joinWaitlist} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <input

@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store/useStore'
+import Img from '../components/Img'
 
 const STATS = [
   ['240+', 'Modelos'],
@@ -115,9 +116,12 @@ export default function Hero() {
               zIndex: 1,
             }}
           >
-            <img
+            <Img
               src={settings.hero_image}
               alt="LEGUI streetwear"
+              w={760}
+              quality={82}
+              priority
               style={{ width: '100%', height: 520, objectFit: 'cover', borderRadius: 18, background: 'var(--bg-3)' }}
             />
             <Link

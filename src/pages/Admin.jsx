@@ -4,7 +4,7 @@ import {
   LayoutDashboard, ShoppingCart, Receipt, Wallet, Boxes,
   Image as ImageIcon, ArrowLeft, Plus, Trash2, Upload, RotateCcw,
   AlertTriangle, CreditCard, ChevronRight, ChevronDown, X, LogOut, Lock, Eye, EyeOff, Store, KeyRound, Star,
-  Wrench, BookOpen, MapPin, Phone, Mail, MessageSquare, Truck, Send,
+  Wrench, BookOpen, MapPin, Phone, Mail, MessageSquare, Truck, Send, Bell,
 } from 'lucide-react'
 import { useStore, effPrice, SURCHARGE, PAYMENT_METHODS, variantStock } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
@@ -156,6 +156,7 @@ export default function Admin() {
   const [tab, setTab] = useState('resumen')
   const products = useStore((s) => s.products)
   const critCount = products.filter(isCrit).length
+  const waitlist = useStore((s) => s.waitlist)
   const settings = useStore((s) => s.settings)
   const updateSettings = useStore((s) => s.updateSettings)
 
@@ -196,6 +197,7 @@ export default function Admin() {
     { id: 'cuentas', label: 'Cuenta corriente', icon: CreditCard },
     { id: 'gastos', label: 'Gastos', icon: Wallet },
     { id: 'stock', label: 'Stock', icon: Boxes, badge: critCount || null },
+    { id: 'espera', label: 'Lista de espera', icon: Bell, badge: waitlist.length || null },
     { id: 'productos', label: 'Productos', icon: ImageIcon },
     { id: 'contenido', label: 'Contenido', icon: Store },
     { id: 'manual', label: 'Manual', icon: BookOpen },
@@ -250,6 +252,7 @@ export default function Admin() {
         {tab === 'cuentas' && <TabCuentas />}
         {tab === 'gastos' && <TabGastos />}
         {tab === 'stock' && <TabStock />}
+        {tab === 'espera' && <TabEspera go={setTab} />}
         {tab === 'productos' && <TabProductos />}
         {tab === 'contenido' && <TabContenido />}
         {tab === 'manual' && <TabManual />}
@@ -264,6 +267,10 @@ function TabResumen({ go }) {
   const expenses = useStore((s) => s.expenses)
   const customers = useStore((s) => s.customers)
   const products = useStore((s) => s.products)
+  const waitlist = useStore((s) => s.waitlist)
+  const loadWaitlist = useStore((s) => s.loadWaitlist)
+  useEffect(() => { loadWaitlist() }, [loadWaitlist])
+  const waitModels = new Set(waitlist.map((w) => w.product_id)).size
 
   const s = useMemo(() => {
     const t = today()
@@ -321,6 +328,13 @@ function TabResumen({ go }) {
           <div className="stat-value" style={{ color: crit.length ? 'var(--red)' : 'var(--green)' }}>{crit.length}</div>
           <div className="stat-hint">{crit.length ? 'Productos en o bajo el mínimo (ver)' : 'Todo OK'}</div>
         </div>
+        {waitModels > 0 && (
+          <div className="stat-card" style={{ borderLeft: '4px solid var(--blue)', cursor: 'pointer' }} onClick={() => go('espera')}>
+            <div className="stat-label">Lista de espera</div>
+            <div className="stat-value" style={{ color: 'var(--blue)' }}>{waitModels}</div>
+            <div className="stat-hint">{waitModels === 1 ? 'modelo que te piden' : 'modelos que te piden'} (ver)</div>
+          </div>
+        )}
       </div>
       {crit.length > 0 && (
         <div className="admin-card" style={{ marginTop: 8 }}>
@@ -851,6 +865,134 @@ function TabStock() {
   )
 }
 
+/* ===================== LISTA DE ESPERA ===================== */
+// Gente anotada en "avisame cuando ingrese". Agrupado por producto y ordenado
+// por más pedidos = qué conviene traer/reponer primero. Cuando repongas stock,
+// a cada uno se le avisa por email automáticamente.
+function TabEspera({ go }) {
+  const products = useStore((s) => s.products)
+  const waitlist = useStore((s) => s.waitlist)
+  const loadWaitlist = useStore((s) => s.loadWaitlist)
+  const toast = useStore((s) => s.toast)
+  const [openId, setOpenId] = useState(null)
+
+  useEffect(() => { loadWaitlist() }, [loadWaitlist])
+
+  const groups = useMemo(() => {
+    const map = new Map()
+    for (const w of waitlist) {
+      const g = map.get(w.product_id) || { productId: w.product_id, name: w.product_name, emails: new Set(), lastAt: 0 }
+      if (w.email) g.emails.add(w.email)
+      const t = new Date(w.created_at).getTime()
+      if (t > g.lastAt) g.lastAt = t
+      if (!g.name && w.product_name) g.name = w.product_name
+      map.set(w.product_id, g)
+    }
+    return [...map.values()]
+      .map((g) => {
+        const product = products.find((x) => x.id === g.productId)
+        const emails = [...g.emails]
+        const inStock = product ? !(product.sold_out || (product.stock ?? 0) <= 0) : false
+        return { ...g, emails, count: emails.length, product, inStock }
+      })
+      .sort((a, b) => b.count - a.count || b.lastAt - a.lastAt)
+  }, [waitlist, products])
+
+  const totalPeople = groups.reduce((n, g) => n + g.count, 0)
+
+  const copyEmails = async (emails) => {
+    try { await navigator.clipboard.writeText(emails.join(', ')); toast('Emails copiados') }
+    catch { toast('No se pudo copiar', 'error') }
+  }
+
+  return (
+    <>
+      <h1 className="anton admin-h">Lista de espera</h1>
+      <p className="muted" style={{ marginBottom: 22 }}>
+        Lo que la gente está esperando que vuelva. Ordenado por más pedidos = qué te conviene traer primero.
+        Cuando repongas el stock, a cada uno se le avisa por email solo.
+      </p>
+
+      {groups.length === 0 ? (
+        <div className="admin-card" style={{ textAlign: 'center', padding: '38px 20px' }}>
+          <Bell size={30} style={{ color: 'var(--faint)', marginBottom: 10 }} />
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>Todavía no hay nadie anotado</div>
+          <p className="muted" style={{ fontSize: 13 }}>
+            Cuando un producto quede agotado, los visitantes van a poder tocar “Avisame cuando ingrese” en la ficha
+            y van a aparecer acá.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="stat-grid" style={{ marginBottom: 16 }}>
+            <div className="stat-card">
+              <div className="stat-label">Modelos pedidos</div>
+              <div className="stat-value">{groups.length}</div>
+            </div>
+            <div className="stat-card">
+              <div className="stat-label">Personas esperando</div>
+              <div className="stat-value">{totalPeople}</div>
+            </div>
+          </div>
+          <div className="admin-card" style={{ overflowX: 'auto' }}>
+            <table className="admin-table">
+              <thead>
+                <tr><th></th><th>Producto</th><th>Esperando</th><th>Estado</th><th>Último pedido</th><th></th></tr>
+              </thead>
+              <tbody>
+                {groups.map((g) => {
+                  const open = openId === g.productId
+                  return (
+                    <Fragment key={g.productId}>
+                      <tr onClick={() => setOpenId(open ? null : g.productId)} style={{ cursor: 'pointer' }}>
+                        <td style={{ width: 24, color: 'var(--faint)' }}>{open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</td>
+                        <td style={{ fontWeight: 600 }}>{g.name || 'Producto eliminado'}</td>
+                        <td><b style={{ color: 'var(--blue)' }}>{g.count}</b> {g.count === 1 ? 'persona' : 'personas'}</td>
+                        <td>
+                          {!g.product
+                            ? <span className="muted">—</span>
+                            : g.inStock
+                              ? <span style={{ color: 'var(--green)', fontWeight: 600 }}>Con stock ({g.product.stock ?? 0})</span>
+                              : <span className="crit">Sin stock</span>}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{g.lastAt ? new Date(g.lastAt).toLocaleDateString('es-AR') : '—'}</td>
+                        <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                          <button className="btn btn-ghost btn-sm" onClick={() => go('stock')} title="Ir a reponer stock">
+                            <Boxes size={13} /> Reponer
+                          </button>
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr>
+                          <td colSpan={6} style={{ background: 'var(--bg-2)', padding: '14px 18px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
+                              <div style={{ fontSize: 11, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                                {g.count} {g.count === 1 ? 'email anotado' : 'emails anotados'}
+                              </div>
+                              <button className="btn btn-ghost btn-sm" onClick={() => copyEmails(g.emails)}>
+                                <Mail size={13} /> Copiar emails
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                              {g.emails.map((em) => (
+                                <span key={em} style={{ fontSize: 13, background: 'var(--bg)', border: '1px solid var(--line-2)', borderRadius: 999, padding: '5px 12px' }}>{em}</span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
 /* ===================== PRODUCTOS (listado + editor) ===================== */
 function TabProductos() {
   const products = useStore((s) => s.products)
@@ -1060,6 +1202,21 @@ function TabManual() {
       <ManualSection title="📦 Stock">
         Listado completo de stock por producto, con alerta cuando un producto está por debajo del mínimo que le
         configuraste (campo "Mínimo" en el editor del producto).
+      </ManualSection>
+
+      <ManualSection title="🔔 Lista de espera">
+        Cuando un producto queda <b>agotado</b>, en la ficha aparece el botón “Avisame cuando ingrese”. La gente
+        deja su email y queda anotada en esta sección, agrupada por producto y ordenada por más pedidos — así
+        sabés qué te conviene traer primero. Apenas volvés a cargar stock de ese producto, a cada persona anotada
+        se le manda un email automático avisando que ya llegó.
+      </ManualSection>
+
+      <ManualSection title="⚡ Velocidad de las fotos">
+        Las fotos se guardan comprimidas en WebP y con caché de larga duración. Si además activás el add-on de
+        <b> Image Transformations</b> en Supabase (Storage → Settings), la web pide cada foto en el tamaño justo
+        para cada lugar (la grilla en el celular baja mucho menos peso). Funciona solo; si tu plan no lo tiene, la
+        web usa la foto original igual, sin romperse. Para forzarlo apagado, la variable de entorno{' '}
+        <code>VITE_IMG_TRANSFORM=0</code>.
       </ManualSection>
 
       <ManualSection title="🖼️ Productos">

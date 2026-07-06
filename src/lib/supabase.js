@@ -34,3 +34,18 @@ if (MOCK && typeof window !== 'undefined') {
     '— datos de ejemplo en el navegador. Completá .env con Supabase para usar la base real.'
   )
 }
+
+// Abrimos la conexión al host de Supabase (donde viven las imágenes) apenas
+// arranca la app, para que la primera foto no pague el costo de DNS + TLS.
+if (!MOCK && url && typeof document !== 'undefined') {
+  try {
+    const origin = new URL(url).origin
+    for (const rel of ['preconnect', 'dns-prefetch']) {
+      const link = document.createElement('link')
+      link.rel = rel
+      link.href = origin
+      if (rel === 'preconnect') link.crossOrigin = 'anonymous'
+      document.head.appendChild(link)
+    }
+  } catch { /* url inválida: ignorar */ }
+}

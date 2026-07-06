@@ -26,6 +26,7 @@ const LS = {
   expenses: `legui_expenses_${STORE_ID}`,
   customers: `legui_customers_${STORE_ID}`,
   stock: `legui_stock_${STORE_ID}`,
+  waitlist: `legui_waitlist_${STORE_ID}`,
 }
 
 // El precio de catálogo ES el precio final con Mercado Pago.
@@ -137,6 +138,7 @@ export const useStore = create((set, get) => ({
   expenses: read(LS.expenses, []),
   customers: read(LS.customers, []),
   stockMovements: read(LS.stock, []),
+  waitlist: read(LS.waitlist, []),
 
   // ---- auth ----
   user: null,
@@ -305,17 +307,48 @@ export const useStore = create((set, get) => ({
   // Carga datos de back-office desde Supabase (sólo cuando autenticado como admin)
   async loadAdminData() {
     if (MOCK) return
-    const [orders, expenses, customers, movements] = await Promise.all([
+    const [orders, expenses, customers, movements, waitlist] = await Promise.all([
       supabase.from('orders').select('*').eq('store_id', STORE_ID).order('created_at', { ascending: false }),
       supabase.from('expenses').select('*').eq('store_id', STORE_ID).order('date', { ascending: false }),
       supabase.from('customers').select('*').eq('store_id', STORE_ID),
       supabase.from('stock_movements').select('*').eq('store_id', STORE_ID).order('created_at', { ascending: false }),
+      supabase.from('product_waitlist').select('*').eq('store_id', STORE_ID).eq('notified', false).order('created_at', { ascending: false }),
     ])
     set({
       orders: orders.data || read(LS.orders, []),
       expenses: expenses.data || read(LS.expenses, []),
       customers: customers.data || read(LS.customers, []),
       stockMovements: movements.data || read(LS.stock, []),
+      waitlist: waitlist.data || [],
+    })
+  },
+
+  // Refresca la lista de espera (gente anotada en "avisame cuando ingrese").
+  // Sirve para el panel: sólo trae las que todavía no fueron avisadas.
+  async loadWaitlist() {
+    if (MOCK) { set({ waitlist: read(LS.waitlist, []) }); return }
+    const { data } = await supabase
+      .from('product_waitlist')
+      .select('*')
+      .eq('store_id', STORE_ID)
+      .eq('notified', false)
+      .order('created_at', { ascending: false })
+    if (data) set({ waitlist: data })
+  },
+
+  // Modo demo: guarda la anotación en localStorage para poder verla en el panel
+  // (con Supabase real, el insert lo hace la ficha de producto directo en la tabla).
+  joinWaitlistLocal(productId, productName, email) {
+    const entry = {
+      id: uid('w'), store_id: STORE_ID, product_id: productId,
+      product_name: productName, email, notified: false, created_at: new Date().toISOString(),
+    }
+    set((s) => {
+      // evitar duplicado exacto (mismo mail + producto)
+      if (s.waitlist.some((w) => w.product_id === productId && w.email === email)) return {}
+      const waitlist = [entry, ...s.waitlist]
+      write(LS.waitlist, waitlist)
+      return { waitlist }
     })
   },
 

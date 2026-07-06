@@ -83,6 +83,15 @@ img {
   max-width: 100%;
 }
 
+/* Fade-in suave al terminar de cargar (mejora la sensación de velocidad) */
+.img-fade {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.img-fade.is-loaded {
+  opacity: 1;
+}
+
 input,
 select,
 textarea {
@@ -359,24 +368,38 @@ label.field {
   padding: 5px 9px;
   border-radius: var(--pill);
 }
-.soldout-overlay {
+/* Badge chico de agotado: se ve el modelo igual (antes tapaba toda la foto) */
+.soldout-badge {
   position: absolute;
-  inset: 0;
-  background: rgba(10, 10, 11, 0.62);
-  display: flex;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(2px);
-}
-.soldout-overlay span {
-  font-family: "Anton", sans-serif;
-  font-size: 26px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  gap: 5px;
+  background: rgba(10, 10, 11, 0.82);
   color: #fff;
-  border: 2px solid #fff;
-  padding: 6px 18px;
-  transform: rotate(-6deg);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: var(--pill);
+  border: 1px solid var(--line-2);
+  backdrop-filter: blur(4px);
+}
+.soldout-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+/* Variante para la ficha de producto (imagen grande) */
+.soldout-badge.lg {
+  top: 14px;
+  left: 14px;
+  font-size: 12px;
+  padding: 7px 13px;
 }
 .fav-btn {
   position: absolute;
@@ -407,18 +430,16 @@ label.field {
   border-color: var(--blue);
 }
 .prod-info {
-  padding: 16px 16px 18px;
+  padding: 14px 16px 16px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 3px;
 }
 .prod-cat {
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--faint);
-  margin-bottom: 6px;
 }
 .prod-name {
   font-weight: 700;
@@ -428,17 +449,68 @@ label.field {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.prod-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
 .prod-old-price {
   font-size: 13px;
   color: var(--faint);
   text-decoration: line-through;
-  margin-top: 4px;
 }
 .prod-price {
   font-size: 21px;
   color: var(--blue);
   white-space: nowrap;
-  flex-shrink: 0;
+}
+/* Línea "efectivo/transferencia con 30% OFF" — es el precio que más convierte */
+.prod-cash {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--green);
+  margin-top: 5px;
+}
+.prod-cash b {
+  font-size: 14px;
+  font-weight: 700;
+}
+.prod-cash .cash-off {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0a0a0b;
+  background: var(--green);
+  padding: 2px 6px;
+  border-radius: var(--pill);
+}
+/* Botón "avisame cuando llegue" en la tarjeta agotada */
+.prod-notify {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 14px 14px;
+  padding: 9px 12px;
+  border-radius: var(--pill);
+  border: 1px solid var(--line-2);
+  background: var(--blue-soft);
+  color: #9fb0ff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  transition: border-color 0.18s, background 0.18s, color 0.18s;
+}
+.prod-notify:hover {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
 }
 
 /* Grids responsive ------------------------------------------------- */
@@ -1040,9 +1112,6 @@ label.field {
     grid-auto-rows: 150px;
   }
   .prod-info {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
     padding: 12px 12px 14px;
   }
   .prod-name {
@@ -1052,6 +1121,8 @@ label.field {
   }
   .prod-price {
     font-size: 18px;
-    margin-top: 2px;
+  }
+  .prod-notify {
+    margin: 0 12px 12px;
   }
 }

@@ -1,5 +1,44 @@
 import { MOCK, supabase } from '../lib/supabase'
 
+// =====================================================================
+// Transformación de imágenes al vuelo (Supabase Storage).
+// Las fotos se guardan en un solo tamaño grande (hasta 1920px). Para una
+// tarjeta de ~380px eso es un desperdicio enorme de bytes → carga lenta.
+// Reescribimos la URL pública al endpoint de render/transform de Supabase
+// para pedir el ancho justo + WebP + calidad. Ej:
+//   .../storage/v1/object/public/legui-media/x.webp
+//   → .../storage/v1/render/image/public/legui-media/x.webp?width=440&quality=70
+//
+// La transformación es un add-on de Supabase (planes pagos). Si no está
+// habilitada, el <Img> detecta el primer error y desactiva las transforma-
+// ciones para toda la sesión, cayendo a la URL original — nunca rompe la web.
+// Se puede forzar apagado con VITE_IMG_TRANSFORM=0.
+// =====================================================================
+const OBJECT_SEG = '/storage/v1/object/public/'
+const RENDER_SEG = '/storage/v1/render/image/public/'
+
+let transformsOn = import.meta.env.VITE_IMG_TRANSFORM !== '0'
+
+// Un error de transformación (plan sin el add-on) apaga la función para toda
+// la sesión, así el resto de las imágenes no duplican pedidos fallidos.
+export const disableImgTransforms = () => { transformsOn = false }
+
+// ¿Esta URL es transformable? (imagen pública de Supabase Storage y feature activa)
+export const canTransform = (url) =>
+  transformsOn && typeof url === 'string' && url.includes(OBJECT_SEG)
+
+// Devuelve la URL transformada al ancho pedido, o la original si no aplica.
+// resize=contain: sin esto, Supabase devuelve el alto ORIGINAL sin escalar
+// (ej. pedís width=440 de una foto 1440x1920 y te da 440x1920, estirada) —
+// eso rompía el encuadre de las tarjetas (object-fit:cover recortaba sobre
+// una imagen ya deformada, mostrando solo un pedazo del producto).
+export function imgUrl(url, { width, quality = 70 } = {}) {
+  if (!width || !canTransform(url)) return url
+  const base = url.replace(OBJECT_SEG, RENDER_SEG)
+  const sep = base.includes('?') ? '&' : '?'
+  return `${base}${sep}width=${Math.round(width)}&quality=${quality}&resize=contain`
+}
+
 // Comprime una imagen en el canvas y devuelve dataURL (modo mock) o la sube
 // al bucket legui-media de Supabase y devuelve la URL pública.
 // quality: 0.70 para productos (balance tamaño/calidad), 1.0 para portadas (máxima calidad)
