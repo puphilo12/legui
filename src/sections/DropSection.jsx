@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
-import Marquee from '../components/Marquee'
+import Marquee, { marqueeItems } from '../components/Marquee'
 
 const pad = (x) => String(x).padStart(2, '0')
 
@@ -75,10 +75,9 @@ export default function DropSection() {
   return (
     <section id="drops" style={{ background: 'var(--blue)', color: '#fff', overflow: 'hidden' }}>
       <Marquee
-        text={settings.drop_marquee || 'VIERNES 20:00 ✸ HASTA -40% ✸ '}
+        items={marqueeItems(settings.drop_marquee).length ? marqueeItems(settings.drop_marquee) : ['VIERNES 20:00', 'HASTA -40%']}
         reversed
-        bg="var(--blue)"
-        color="#fff"
+        variant="azul"
         size={22}
         border={false}
       />

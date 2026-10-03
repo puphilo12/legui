@@ -12,6 +12,7 @@ import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
 import { uploadMedia } from '../utils/image'
 import Logo from '../components/Logo'
+import Marquee, { storeMarqueeItems, marqueeItems } from '../components/Marquee'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const monthOf = (iso) => (iso || '').slice(0, 7)
@@ -1368,7 +1369,9 @@ const SETTINGS_KEYS = [
   'slogan_title', 'slogan_subtitle', 'instagram', 'tiktok', 'youtube', 'twitter', 'facebook',
   'pickup_enabled', 'showroom_address',
   'bulk_enabled', 'bulk_category', 'bulk_min_units', 'bulk_percent',
+  'marquee', 'marquee_style', 'drop_marquee',
 ]
+const MARQUEE_STYLES = [['azul', 'Azul'], ['negro', 'Negra con plateado'], ['plateado', 'Plateada']]
 
 function SettingsForm() {
   const settings = useStore((s) => s.settings)
@@ -1395,6 +1398,7 @@ function SettingsForm() {
       bulk_category: draft.bulk_category || null,
       bulk_min_units: bulkMin,
       bulk_percent: bulkPct,
+      marquee_style: draft.marquee_style || 'azul',
     })
     setSaving(false)
     toast(res?.ok !== false ? 'Cambios guardados ✓' : 'Error al guardar: ' + res.error, res?.ok !== false ? 'ok' : 'error')
@@ -1415,6 +1419,43 @@ function SettingsForm() {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }} className="slogan-grid">
           <Field label="Título del hero"><textarea className="admin-input" rows={3} {...D('slogan_title')} /></Field>
           <Field label="Subtítulo del hero"><textarea className="admin-input" rows={3} {...D('slogan_subtitle')} /></Field>
+        </div>
+      </div>
+
+      <h3 style={{ marginBottom: 4 }}>Cinta animada</h3>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+        La banda que corre debajo de la portada. Escribí un mensaje por renglón: se separan solos con estrellitas.
+        El envío gratis y el descuento mayorista se agregan solos (si están activos) y se actualizan cuando los cambiás.
+      </p>
+      <div className="admin-card" style={{ marginBottom: 18 }}>
+        <label className="admin-label">Color</label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+          {MARQUEE_STYLES.map(([v, l]) => (
+            <TogglePill key={v} on={(draft.marquee_style || 'azul') === v} onClick={() => setDraft((d) => ({ ...d, marquee_style: v }))}>{l}</TogglePill>
+          ))}
+        </div>
+        <Field label="Mensajes de la portada (uno por renglón)">
+          <textarea className="admin-input" rows={4} placeholder={'LEGUI IMPORTADOS\nPERFUMES Y ROPA IMPORTADA\nNUEVOS INGRESOS TODAS LAS SEMANAS'} {...D('marquee')} />
+        </Field>
+        <div style={{ margin: '12px -20px 4px', overflow: 'hidden' }}>
+          <Marquee
+            items={storeMarqueeItems({
+              ...draft,
+              free_shipping_threshold: Number(draft.free_shipping_threshold) || 0,
+              bulk_enabled: !!draft.bulk_enabled,
+              bulk_percent: Number(draft.bulk_percent) || 0,
+              bulk_min_units: Number(draft.bulk_min_units) || 0,
+            })}
+            variant={draft.marquee_style || 'azul'}
+            size={20}
+          />
+        </div>
+        <p className="muted" style={{ fontSize: 11, marginBottom: 14 }}>Vista previa. Se publica cuando tocás "Guardar cambios".</p>
+        <Field label="Mensajes de la cinta del drop (uno por renglón)">
+          <textarea className="admin-input" rows={3} placeholder={'VIERNES 20:00\nHASTA -40%'} {...D('drop_marquee')} />
+        </Field>
+        <div style={{ margin: '12px -20px 0', overflow: 'hidden' }}>
+          <Marquee items={marqueeItems(draft.drop_marquee).length ? marqueeItems(draft.drop_marquee) : ['VIERNES 20:00', 'HASTA -40%']} reversed size={18} border={false} />
         </div>
       </div>
 

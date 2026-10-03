@@ -81,7 +81,7 @@ export default function ProductDetail() {
       '@type': 'Product',
       name: product.name,
       image: gallery.length ? gallery : [product.image].filter(Boolean),
-      description: product.description || `${product.name} — LEGUI streetwear`,
+      description: product.description || `${product.name} — Legui Importados`,
       sku: product.id,
       category: product.category,
       offers: {

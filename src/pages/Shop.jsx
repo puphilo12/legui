@@ -82,8 +82,8 @@ export default function Shop() {
   useSEO({
     title: q ? `Resultados para "${q}"` : cat ? cat : 'Tienda',
     description: cat
-      ? `Comprá ${cat.toLowerCase()} en LEGUI — streetwear y zapatillas urbanas, envíos a todo el país.`
-      : 'Catálogo completo de LEGUI: zapatillas, ropa y accesorios streetwear. Stock limitado, drops semanales.',
+      ? `Comprá ${cat.toLowerCase()} en Legui Importados — perfumes y ropa importada, envíos a todo el país.`
+      : 'Catálogo completo de Legui Importados: perfumes, ropa y accesorios importados. Descuento mayorista y envíos a todo el país.',
     path: cat ? `/tienda?cat=${encodeURIComponent(cat)}` : '/tienda',
     noindex: !!q, // resultados de búsqueda interna: no indexar (contenido duplicado/efímero)
   })

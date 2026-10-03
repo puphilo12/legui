@@ -29,8 +29,8 @@ const setCanonical = (href) => {
 // dependencia — la app es chica y solo necesita reemplazar tags existentes.
 export function useSEO({ title, description, image, path = '/', noindex = false, jsonLd = null }) {
   useEffect(() => {
-    const fullTitle = title ? `${title} · LEGUI` : 'LEGUI · Streetwear & Zapatillas'
-    const desc = description || 'LEGUI — Streetwear sin reglas. Drops semanales, ediciones limitadas y zapatillas que mueven la ciudad.'
+    const fullTitle = title ? `${title} · Legui Importados` : 'Legui Importados · Perfumes y ropa importada'
+    const desc = description || 'Legui Importados — perfumes y ropa importada. Descuento mayorista y envíos a todo el país.'
     const img = image || DEFAULT_IMAGE
     const url = `${SITE_URL}${path}`
 

@@ -181,7 +181,7 @@ export default function Header() {
               <input
                 ref={inputRef}
                 className="input"
-                placeholder="Buscar zapatillas, hoodies, cargos…"
+                placeholder="Buscar perfumes, ropa, accesorios…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />

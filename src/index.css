@@ -616,9 +616,53 @@ label.field {
 
 .marquee-track {
   display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   will-change: transform;
   animation: marquee 14s linear infinite;
+}
+
+/* Cinta animada: tres estilos que elige el dueño en Admin → Contenido */
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 14px 0;
+}
+.marquee-text {
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+}
+.marquee-azul {
+  background: var(--blue);
+  color: #fff;
+}
+.marquee-negro {
+  background: #050506;
+  color: #fff;
+}
+.marquee-negro .marquee-text {
+  background: var(--chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.marquee-negro .marquee-sep {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.85));
+}
+.marquee-plateado {
+  background: linear-gradient(180deg, #f7f8fa 0%, #dcdfe5 46%, #b9bec8 54%, #eef0f3 100%);
+  color: #0a0a0b;
+}
+.marquee-plateado .marquee-sep {
+  color: #0a0a0b;
+}
+.marquee-border {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.marquee-plateado.marquee-border {
+  border-color: rgba(0, 0, 0, 0.18);
 }
 .marquee-track.rev {
   animation-name: marqueeR;

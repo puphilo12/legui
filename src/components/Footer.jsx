@@ -32,7 +32,7 @@ export default function Footer() {
             <img src="/logo-joya-full.png" alt="Legui Importados Arg" width={230} height={166} loading="lazy" style={{ width: 230, height: 'auto' }} />
           </Link>
           <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginTop: 14 }}>
-            Streetwear y zapatillas urbanas. Hecho en la ciudad, para la ciudad. Drops semanales y ediciones limitadas.
+            Perfumes y ropa importada. Descuento mayorista y envíos a todo el país.
           </p>
           {socials.length > 0 && (
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
@@ -96,7 +96,7 @@ export default function Footer() {
           color: 'var(--faint)',
         }}
       >
-        <span>© {new Date().getFullYear()} LEGUI — Todos los derechos reservados</span>
+        <span>© {new Date().getFullYear()} Legui Importados — Todos los derechos reservados</span>
         <a
           href="https://www.instagram.com/maxi.violaok"
           target="_blank"

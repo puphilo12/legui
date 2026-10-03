@@ -117,7 +117,7 @@ export default function Hero() {
           >
             <Img
               src={settings.hero_image}
-              alt="LEGUI streetwear"
+              alt="Perfumes importados en Legui Importados"
               w={760}
               quality={82}
               priority
