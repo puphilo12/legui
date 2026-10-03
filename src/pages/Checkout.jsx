@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Check, Truck, Store, MessageCircle, Landmark, Wallet, ShieldCheck, Copy, MapPin, User, LogIn } from 'lucide-react'
-import { useStore, CASH_DISCOUNT } from '../store/useStore'
+import { useStore, CASH_DISCOUNT, bulkDiscount } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
+import { trackInitiateCheckout, trackPurchase } from '../lib/pixel'
 
 const empty = {
   nombre: '', telefono: '', email: '',
@@ -23,6 +24,7 @@ export default function Checkout() {
   const navigate = useNavigate()
   const cart = useStore((s) => s.cart)
   const settings = useStore((s) => s.settings)
+  const products = useStore((s) => s.products)
   const placeOrder = useStore((s) => s.placeOrder)
   const toast = useStore((s) => s.toast)
   const user = useStore((s) => s.user)
@@ -38,7 +40,7 @@ export default function Checkout() {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPw, setLoginPw] = useState('')
   const [loginBusy, setLoginBusy] = useState(false)
-  const set = (patch) => setF((s) => ({ ...s, ...patch }))
+  const set =(patch) => setF((s) => ({ ...s, ...patch }))
 
   useSEO({ title: 'Checkout', path: '/checkout', noindex: true })
 
@@ -63,6 +65,8 @@ export default function Checkout() {
     if (!settings?.pickup_enabled) set({ entrega: 'envio' })
   }, [settings?.pickup_enabled])
 
+  useEffect(() => { if (cart.length) trackInitiateCheckout(cart) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const copy = (text) => {
     if (!text) return
     navigator.clipboard?.writeText(text).then(() => toast('Copiado ✓')).catch(() => {})
@@ -76,8 +80,12 @@ export default function Checkout() {
   // Transferencia, efectivo y WhatsApp llevan descuento.
   const DISCOUNT_LABEL = `${(CASH_DISCOUNT * 100).toLocaleString('es-AR')}%`
   const hasDiscount = ['transferencia', 'efectivo', 'whatsapp'].includes(f.paymentMethod)
-  const discount = hasDiscount ? Math.round(subtotal * CASH_DISCOUNT) : 0
-  const grandTotal = subtotal - discount
+  // Descuento mayorista (automático por cantidad) y, encima, el de pago en efectivo.
+  const bulk = bulkDiscount(cart, products, settings)
+  const afterBulk = subtotal - bulk.amount
+  const grandTotal = hasDiscount ? Math.round(afterBulk * (1 - CASH_DISCOUNT)) : afterBulk
+  const cashAmount = afterBulk - grandTotal
+  const bulkLabel = `Mayorista · ${bulk.percent}% OFF${bulk.category ? ` en ${bulk.category.toLowerCase()}` : ''}`
 
   const buildWhatsApp = (order) => {
     const phone = (settings?.whatsapp || '').replace(/\D/g, '')
@@ -95,9 +103,14 @@ export default function Checkout() {
       : `Envío a: ${c.direccion}, ${c.localidad}${c.provincia ? ', ' + c.provincia : ''}${c.cp ? ' (CP ' + c.cp + ')' : ''}`
     const method = order.payment_method || order.paymentMethod
     const orderSubtotal = order.items.reduce((n, i) => n + i.price * i.qty, 0)
-    const orderDiscount = orderSubtotal - order.total
-    const totales = orderDiscount > 0
-      ? `Subtotal: ${money(orderSubtotal)}\nDescuento ${DISCOUNT_LABEL} OFF (${PAY_LABEL[method] || method}): -${money(orderDiscount)}\nTotal: ${money(order.total)}`
+    const orderBulk = order.bulk_discount || 0
+    const orderCash = orderSubtotal - orderBulk - order.total
+    const descuentos = [
+      orderBulk > 0 && `Mayorista ${order.bulk_percent}% OFF: -${money(orderBulk)}`,
+      orderCash > 0 && `Descuento ${DISCOUNT_LABEL} OFF (${PAY_LABEL[method] || method}): -${money(orderCash)}`,
+    ].filter(Boolean)
+    const totales = descuentos.length
+      ? `Subtotal: ${money(orderSubtotal)}\n${descuentos.join('\n')}\nTotal: ${money(order.total)}`
       : `Total: ${money(order.total)}`
     const msg =
       `Hola LEGUI! 👋 Nuevo pedido #${order.id.slice(-5)}\n\n` +
@@ -139,7 +152,8 @@ export default function Checkout() {
         const mpRes = await fetch('/api/mp-preference', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: cart, customer: f, external_reference: res.order.id }),
+          // Mercado Pago cobra la suma de los items: les mandamos el precio ya con el descuento mayorista.
+          body: JSON.stringify({ items: cart.map((i) => ({ ...i, price: bulk.unitPrice(i) })), customer: f, external_reference: res.order.id }),
         })
         const mpData = await mpRes.json()
         if (!mpRes.ok) throw new Error(mpData.error || 'Error MP')
@@ -153,6 +167,11 @@ export default function Checkout() {
         return
       }
     }
+
+    // Purchase se dispara acá para los métodos que se confirman al toque en el navegador.
+    // Mercado Pago redirige fuera del sitio: ese Purchase se manda por Conversions API
+    // desde api/mp-webhook.js (server-side) y, como backup, al volver a /mi-cuenta?pago=ok.
+    trackPurchase(res.order)
 
     const wa = (f.paymentMethod === 'whatsapp' || f.paymentMethod === 'transferencia') ? buildWhatsApp(res.order) : null
     if (wa) window.open(wa, '_blank')
@@ -383,9 +402,15 @@ export default function Checkout() {
                 </div>
               ))}
             </div>
+            {!bulk.active && bulk.units > 0 && bulk.percent > 0 && (
+              <p style={{ fontSize: 12, color: 'var(--blue)', background: 'var(--blue-soft)', borderRadius: 10, padding: '9px 12px', marginBottom: 14 }}>
+                Sumá {bulk.missing} {bulk.missing === 1 ? 'unidad' : 'unidades'} más{bulk.category ? ` de ${bulk.category.toLowerCase()}` : ''} y llevás {bulk.percent}% OFF.
+              </p>
+            )}
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
               <Row label="Subtotal" value={money(subtotal)} />
-              {discount > 0 && <Row label={`Descuento ${DISCOUNT_LABEL} OFF`} value={'-' + money(discount)} accent />}
+              {bulk.active && <Row label={bulkLabel} value={'-' + money(bulk.amount)} accent />}
+              {cashAmount > 0 && <Row label={`Descuento ${DISCOUNT_LABEL} OFF`} value={'-' + money(cashAmount)} accent />}
               <Row label="Envío" value={freeShip ? 'Gratis' : 'A coordinar'} accent={freeShip} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 }}>
                 <span style={{ fontWeight: 600 }}>Total</span>

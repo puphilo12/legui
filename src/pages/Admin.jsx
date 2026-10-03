@@ -1367,6 +1367,7 @@ const SETTINGS_KEYS = [
   'brand', 'whatsapp', 'free_shipping_threshold', 'alias', 'cbu', 'bank_holder',
   'slogan_title', 'slogan_subtitle', 'instagram', 'tiktok', 'youtube', 'twitter', 'facebook',
   'pickup_enabled', 'showroom_address',
+  'bulk_enabled', 'bulk_category', 'bulk_min_units', 'bulk_percent',
 ]
 
 function SettingsForm() {
@@ -1378,10 +1379,23 @@ function SettingsForm() {
   const D = (k) => ({ value: draft[k] ?? '', onChange: (e) => setDraft((d) => ({ ...d, [k]: e.target.value })) })
   const dirty = SETTINGS_KEYS.some((k) => String(draft[k] ?? '') !== String(settings[k] ?? ''))
   const [saving, setSaving] = useState(false)
+  const products = useStore((s) => s.products)
+  const categories = [...new Set(products.map((p) => p.category).filter(Boolean))]
 
   const save = async () => {
+    const bulkMin = Number(draft.bulk_min_units) || 10
+    const bulkPct = Number(draft.bulk_percent) || 28
+    if (draft.bulk_enabled && (!Number.isInteger(bulkMin) || bulkMin < 2)) return toast('El mínimo de unidades tiene que ser un número entero, 2 o más', 'info')
+    if (draft.bulk_enabled && (!Number.isInteger(bulkPct) || bulkPct < 1 || bulkPct > 100)) return toast('El descuento mayorista tiene que ser un entero entre 1 y 100', 'info')
     setSaving(true)
-    const res = await updateSettings({ ...draft, free_shipping_threshold: Number(draft.free_shipping_threshold) || 0 })
+    const res = await updateSettings({
+      ...draft,
+      free_shipping_threshold: Number(draft.free_shipping_threshold) || 0,
+      bulk_enabled: !!draft.bulk_enabled,
+      bulk_category: draft.bulk_category || null,
+      bulk_min_units: bulkMin,
+      bulk_percent: bulkPct,
+    })
     setSaving(false)
     toast(res?.ok !== false ? 'Cambios guardados ✓' : 'Error al guardar: ' + res.error, res?.ok !== false ? 'ok' : 'error')
   }
@@ -1402,6 +1416,29 @@ function SettingsForm() {
           <Field label="Título del hero"><textarea className="admin-input" rows={3} {...D('slogan_title')} /></Field>
           <Field label="Subtítulo del hero"><textarea className="admin-input" rows={3} {...D('slogan_subtitle')} /></Field>
         </div>
+      </div>
+
+      <h3 style={{ marginBottom: 4 }}>Descuento mayorista (automático)</h3>
+      <p className="muted" style={{ fontSize: 12, marginBottom: 12 }}>
+        Si el carrito junta el mínimo de unidades (mezcladas, da igual cuáles), esas unidades llevan el descuento solo, sin código.
+        Va primero y el 30% por transferencia/efectivo/WhatsApp se aplica encima. Con Mercado Pago solo rige el mayorista.
+      </p>
+      <div className="admin-card" style={{ marginBottom: 18 }}>
+        <TogglePill on={!!draft.bulk_enabled} onClick={() => setDraft((d) => ({ ...d, bulk_enabled: !d.bulk_enabled }))}>
+          {draft.bulk_enabled ? 'Descuento mayorista activado' : 'Descuento mayorista desactivado'}
+        </TogglePill>
+        {draft.bulk_enabled && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12, marginTop: 12 }}>
+            <Field label="Categoría">
+              <select className="admin-input" {...D('bulk_category')}>
+                <option value="">Toda la tienda</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Desde (unidades)"><input type="number" min={2} className="admin-input" {...D('bulk_min_units')} /></Field>
+            <Field label="Descuento %"><input type="number" min={1} max={100} className="admin-input" {...D('bulk_percent')} /></Field>
+          </div>
+        )}
       </div>
 
       <h3 style={{ marginBottom: 4 }}>Entrega</h3>

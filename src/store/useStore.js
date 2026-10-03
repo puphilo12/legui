@@ -8,6 +8,7 @@ import {
   MOCK_DROPS,
 } from '../data/mockData'
 import { slugify, uid } from '../utils/format'
+import { trackAddToCart, trackInitiateCheckout, trackPurchase } from '../lib/pixel'
 
 // Debounce maps para writes frecuentes (evitar spam a Supabase)
 const _pd = {} // product debounces
@@ -64,6 +65,28 @@ const write = (key, value) => {
 }
 
 export const effPrice = (p) => Number(p?.discount_price ?? p?.price ?? 0)
+
+// Descuento mayorista automático: si el carrito junta `bulk_min_units` o más
+// unidades de la categoría configurada (mezcladas, da igual cuáles), esas unidades
+// llevan `bulk_percent`% OFF. Se aplica ANTES del descuento por pago en efectivo,
+// que va encima (se encadenan). Sin categoría configurada cuenta todo el carrito.
+export function bulkDiscount(cart, products, settings) {
+  const none = { active: false, percent: 0, amount: 0, units: 0, missing: 0, minUnits: 0, category: null, unitPrice: (i) => i.price }
+  if (!settings?.bulk_enabled) return none
+  const percent = Number(settings.bulk_percent) || 0
+  const minUnits = Number(settings.bulk_min_units) || 0
+  const category = settings.bulk_category || null
+  if (percent <= 0 || minUnits <= 0) return none
+
+  const eligible = (i) => !category || products.find((p) => p.id === i.id)?.category === category
+  const units = cart.filter(eligible).reduce((n, i) => n + i.qty, 0)
+  const active = units >= minUnits
+  const unitPrice = (i) => (active && eligible(i) ? Math.round(i.price * (100 - percent)) / 100 : i.price)
+  const amount = active
+    ? Math.round(cart.filter(eligible).reduce((n, i) => n + i.price * i.qty, 0) * percent / 100)
+    : 0
+  return { active, percent, amount, units, missing: Math.max(0, minUnits - units), minUnits, category, unitPrice }
+}
 
 const cartKey = (id, color, size) => `${id}|${color || '-'}|${size || '-'}`
 
@@ -402,6 +425,7 @@ export const useStore = create((set, get) => ({
       write(LS.cart, cart)
       return { cart, cartOpen: true }
     })
+    trackAddToCart(product, effPrice(product), qty)
     get().toast(`Agregado: ${product.name}`)
   },
   setQty(key, qty) {
@@ -648,11 +672,12 @@ export const useStore = create((set, get) => ({
 
   // Pedido desde el carrito (checkout web)
   async placeOrder({ customer = {}, paymentMethod = 'whatsapp', channel = 'web', surcharge = 0 } = {}) {
-    const { cart, products, user } = get()
+    const { cart, products, user, settings } = get()
     if (!cart.length) return { ok: false, error: 'El carrito está vacío' }
 
     const subtotal = cart.reduce((n, i) => n + i.price * i.qty, 0)
-    const total = Math.round(subtotal * (1 + surcharge))
+    const bulk = bulkDiscount(cart, products, settings)
+    const total = Math.round((subtotal - bulk.amount) * (1 + surcharge))
     // El stock queda reservado mientras el pedido está "Pendiente". Pasado el plazo
     // sin confirmarse, el cron (api/cancel-expired-orders.js) lo cancela y devuelve
     // el stock. Mercado Pago se confirma solo (webhook, ver api/mp-webhook.js) así
@@ -668,6 +693,7 @@ export const useStore = create((set, get) => ({
         cost: Number(products.find((p) => p.id === i.id)?.cost || 0),
       })),
       total, created_by: user?.id || null, user_id: user?.id || null, reserved_until: reservedUntil,
+      ...(bulk.active ? { bulk_percent: bulk.percent, bulk_discount: bulk.amount } : {}),
     }
 
     set((s) => {
