@@ -8,6 +8,7 @@ import { useStore } from '../store/useStore'
 import { useSEO } from '../hooks/useSEO'
 import { MOCK } from '../lib/supabase'
 import { money } from '../utils/format'
+import { trackPurchase } from '../lib/pixel'
 import ProductCard from '../components/ProductCard'
 import Logo from '../components/Logo'
 
@@ -267,6 +268,7 @@ export default function MiCuenta() {
   const isAdmin = useStore((s) => s.isAdmin)
   const authLoading = useStore((s) => s.authLoading)
   const signOut = useStore((s) => s.signOut)
+  const buyerOrders = useStore((s) => s.buyerOrders)
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [tab, setTab] = useState('pedidos')
@@ -274,6 +276,21 @@ export default function MiCuenta() {
   useSEO({ title: 'Mi cuenta', path: '/mi-cuenta', noindex: true })
 
   const isRecovery = searchParams.get('recovery') === '1'
+
+  // Backup client-side del Purchase de Mercado Pago: la fuente confiable es el
+  // webhook (api/mp-webhook.js, vía Conversions API), esto solo suma señal en
+  // el navegador. Usa el mismo event_id (purchase_<orderId>) para que Meta dedupe.
+  useEffect(() => {
+    if (searchParams.get('pago') !== 'ok') return
+    const orderId = searchParams.get('external_reference')
+    const order = orderId ? buyerOrders.find((o) => o.id === orderId) : null
+    if (!order) return // buyerOrders puede no haber cargado todavía; reintenta cuando cambie
+    trackPurchase(order, `purchase_${order.id}`)
+    const next = new URLSearchParams(searchParams)
+    next.delete('pago')
+    next.delete('external_reference')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, buyerOrders]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Admins van al panel admin, no a mi cuenta
   useEffect(() => {

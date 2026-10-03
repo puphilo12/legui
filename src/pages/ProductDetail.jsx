@@ -6,6 +6,7 @@ import { useReveal } from '../hooks/useReveal'
 import { useSEO, SITE_URL } from '../hooks/useSEO'
 import { money } from '../utils/format'
 import { supabase, MOCK, STORE_ID } from '../lib/supabase'
+import { trackViewContent } from '../lib/pixel'
 import ProductCard from '../components/ProductCard'
 import Img from '../components/Img'
 import SizeGuide from '../components/SizeGuide'
@@ -50,6 +51,8 @@ export default function ProductDetail() {
   }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setQty(1) }, [color, size])
+
+  useEffect(() => { if (product) trackViewContent(product) }, [product?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useReveal([product?.id, related.length])
 

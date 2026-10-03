@@ -1,5 +1,6 @@
 import { restoreStock } from './_lib/restoreStock.js'
 import { sendOrderStatusEmail } from './_lib/orderStatusEmail.js'
+import { sendCapiEvent } from './_lib/metaCapi.js'
 
 const STATUS_MAP = {
   approved: 'Pagado',
@@ -71,6 +72,14 @@ export default async function handler(req, res) {
     // reenviar si MP retransmite el mismo webhook).
     if (order.status !== newStatus && (newStatus === 'Pagado' || newStatus === 'Cancelado')) {
       await sendOrderStatusEmail({ id: orderId, ...order }, newStatus)
+    }
+
+    // 6. Purchase a Meta Conversions API — única fuente confiable para pagos con
+    // Mercado Pago (el usuario sale del sitio, el pixel de navegador no llega a
+    // confirmarse). event_id compartido con el backup client-side (ver MiCuenta.jsx)
+    // para que Meta deduplique si ambos llegan a dispararse.
+    if (order.status !== newStatus && newStatus === 'Pagado') {
+      await sendCapiEvent('Purchase', { eventId: `purchase_${orderId}`, order: { ...order, id: orderId } })
     }
 
     return res.status(200).json({ ok: true })
