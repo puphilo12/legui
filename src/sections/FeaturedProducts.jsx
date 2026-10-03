@@ -14,7 +14,7 @@ export default function FeaturedProducts() {
         <h2 className="anton chrome spark-title">
           Nuevos<br />productos
         </h2>
-        <p>Lo último en zapatillas y prendas. Stock limitado — cuando se va, se va.</p>
+        <p>Lo último en perfumes y ropa importada. Stock limitado — cuando se va, se va.</p>
       </div>
 
       <div className="grid-products">
