@@ -244,7 +244,7 @@ export default function ProductDetail() {
           </div>
 
           {product.description && (
-            <p style={{ color: 'var(--muted)', fontSize: 15, lineHeight: 1.6, marginBottom: 26 }}>
+            <p style={{ color: 'var(--muted)', fontSize: 15, lineHeight: 1.6, marginBottom: 26, whiteSpace: 'pre-line' }}>
               {product.description}
             </p>
           )}
