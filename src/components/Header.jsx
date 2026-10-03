@@ -9,6 +9,7 @@ const NAV = [
   { label: 'Tienda', to: '/tienda' },
   { label: 'Zapatillas', to: '/tienda?cat=Zapatillas' },
   { label: 'Ropa', to: '/tienda?cat=Ropa' },
+  { label: 'Accesorios', to: '/tienda?cat=Accesorios' },
   { label: 'Lookbook', to: '/#lookbook' },
   { label: 'Drops', to: '/#drops' },
 ]

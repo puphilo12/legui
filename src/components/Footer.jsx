@@ -60,6 +60,7 @@ export default function Footer() {
               <Link to="/tienda" className="muted">Catálogo</Link>
               <Link to="/tienda?cat=Zapatillas" className="muted">Zapatillas</Link>
               <Link to="/tienda?cat=Ropa" className="muted">Ropa</Link>
+              <Link to="/tienda?cat=Accesorios" className="muted">Accesorios</Link>
               <Link to="/#drops" className="muted">Drops</Link>
             </div>
           </div>
