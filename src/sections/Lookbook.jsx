@@ -23,7 +23,7 @@ export default function Lookbook() {
     >
       <div className="wrap">
         <div className="section-head" data-reveal>
-          <h2 className="anton">Lookbook 26</h2>
+          <h2 className="anton chrome spark-title">Lookbook 26</h2>
           <p>La calle es la pasarela. El editorial de la temporada, sin pose.</p>
         </div>
 

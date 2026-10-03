@@ -409,7 +409,7 @@ export default function Checkout() {
             )}
             <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
               <Row label="Subtotal" value={money(subtotal)} />
-              {bulk.active && <Row label={bulkLabel} value={'-' + money(bulk.amount)} accent />}
+              {bulk.active && <Row label={<span className="spark-badge" style={{ color: 'var(--text)' }}>{bulkLabel}</span>} value={'-' + money(bulk.amount)} accent />}
               {cashAmount > 0 && <Row label={`Descuento ${DISCOUNT_LABEL} OFF`} value={'-' + money(cashAmount)} accent />}
               <Row label="Envío" value={freeShip ? 'Gratis' : 'A coordinar'} accent={freeShip} />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10 }}>
@@ -417,7 +417,7 @@ export default function Checkout() {
                 <span className="anton" style={{ fontSize: 28 }}>{money(grandTotal)}</span>
               </div>
             </div>
-            <button type="submit" className="btn btn-blue btn-block" style={{ marginTop: 16 }} disabled={submitting}>
+            <button type="submit" className="btn btn-blue btn-block btn-shine" style={{ marginTop: 16 }} disabled={submitting}>
               {submitting
                 ? 'Procesando…'
                 : f.paymentMethod === 'mercadopago'

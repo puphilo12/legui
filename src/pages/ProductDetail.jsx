@@ -10,6 +10,18 @@ import { trackViewContent } from '../lib/pixel'
 import ProductCard from '../components/ProductCard'
 import Img from '../components/Img'
 import SizeGuide from '../components/SizeGuide'
+import { SparkleField } from '../components/Sparkle'
+
+// En las esquinas de la foto, mitad afuera: sobre el fondo blanco del producto no se verían.
+// Centradas sobre el borde del marco (calc(... - size/2)).
+const PHOTO_SPARKLES = [
+  { top: 'calc(0% - 13px)', left: 'calc(0% - 13px)', size: 26, delay: 0 },
+  { top: 'calc(14% - 8px)', left: 'calc(100% - 8px)', size: 16, delay: 1.4 },
+  { top: 'calc(100% - 12px)', left: 'calc(100% - 12px)', size: 24, delay: 2.4 },
+  { top: 'calc(100% - 8px)', left: 'calc(18% - 8px)', size: 16, delay: 0.8 },
+  { top: 'calc(0% - 7px)', left: 'calc(62% - 7px)', size: 14, delay: 3, desk: true },
+  { top: 'calc(55% - 6px)', left: 'calc(0% - 6px)', size: 12, delay: 1.9, desk: true },
+]
 
 export default function ProductDetail() {
   const { slug } = useParams()
@@ -161,21 +173,24 @@ export default function ProductDetail() {
       <div className="pdp-grid">
         {/* galería */}
         <div data-reveal>
-          <div
-            style={{
-              position: 'relative',
-              borderRadius: 18,
-              overflow: 'hidden',
-              border: '1px solid var(--line)',
-              background: 'var(--bg-3)',
-              aspectRatio: '4 / 5',
-            }}
-          >
-            {/* Imagen principal en resolución original: acá la gente mira el detalle
-                de la zapatilla de cerca, así que priorizamos nitidez sobre peso. */}
-            <Img src={mainImg} alt={product.name} priority style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            {hasDiscount && !soldOut && <span className="off-badge" style={{ fontSize: 12 }}>-{off}%</span>}
-            {soldOut && <span className="soldout-badge lg">Agotado</span>}
+          <div style={{ position: 'relative' }}>
+            <div
+              style={{
+                position: 'relative',
+                borderRadius: 18,
+                overflow: 'hidden',
+                border: '1px solid var(--line)',
+                background: 'var(--bg-3)',
+                aspectRatio: '4 / 5',
+              }}
+            >
+              {/* Imagen principal en resolución original: acá la gente mira el detalle
+                  de la zapatilla de cerca, así que priorizamos nitidez sobre peso. */}
+              <Img src={mainImg} alt={product.name} priority style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {hasDiscount && !soldOut && <span className="off-badge" style={{ fontSize: 12 }}>-{off}%</span>}
+              {soldOut && <span className="soldout-badge lg">Agotado</span>}
+            </div>
+            <SparkleField items={PHOTO_SPARKLES} />
           </div>
 
           {gallery.length > 1 && (
@@ -207,7 +222,7 @@ export default function ProductDetail() {
           <div className="eyebrow" style={{ color: 'var(--faint)', marginBottom: 10 }}>
             {product.category}
           </div>
-          <h1 className="anton" style={{ fontSize: 'clamp(32px,4.5vw,56px)', lineHeight: 0.95, margin: '0 0 16px' }}>
+          <h1 className="anton chrome spark-title" style={{ fontSize: 'clamp(32px,4.5vw,56px)', lineHeight: 0.95, margin: '0 0 16px' }}>
             {product.name}
           </h1>
 
@@ -240,7 +255,7 @@ export default function ProductDetail() {
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', background: 'rgba(52,210,123,.10)', border: '1px solid rgba(52,210,123,.28)', color: 'var(--green)', borderRadius: 12, padding: '10px 14px', marginBottom: 24, fontSize: 14 }}>
             <span>💵 Efectivo o transferencia</span>
             <b className="anton" style={{ fontSize: 20 }}>{money(cashPrice)}</b>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', color: '#0a0a0b', background: 'var(--green)', padding: '3px 8px', borderRadius: 999 }}>30% OFF</span>
+            <span className="spark-badge" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.04em', color: '#0a0a0b', background: 'var(--green)', padding: '3px 8px', borderRadius: 999 }}>30% OFF</span>
           </div>
 
           {product.description && (
@@ -317,7 +332,7 @@ export default function ProductDetail() {
               </div>
             )}
             <button
-              className="btn btn-blue"
+              className={`btn btn-blue${soldOut || variantSoldOut ? '' : ' btn-shine'}`}
               style={{ flex: 1, minWidth: 200 }}
               onClick={add}
               disabled={soldOut || variantSoldOut}
@@ -398,7 +413,7 @@ export default function ProductDetail() {
       {/* relacionados */}
       {related.length > 0 && (
         <div style={{ marginTop: 80 }}>
-          <h2 className="anton" style={{ fontSize: 'clamp(26px,3.5vw,42px)', marginBottom: 26 }}>
+          <h2 className="anton chrome spark-title" style={{ fontSize: 'clamp(26px,3.5vw,42px)', marginBottom: 26 }}>
             También te puede gustar
           </h2>
           <div className="grid-products">

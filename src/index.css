@@ -645,6 +645,240 @@ label.field {
   animation: spin 0.8s linear infinite;
 }
 
+/* Brillo de joya (estilo del logo): estrellitas, cromo y destellos ----- */
+:root {
+  --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0C12.9 7.6 16.4 11.1 24 12C16.4 12.9 12.9 16.4 12 24C11.1 16.4 7.6 12.9 0 12C7.6 11.1 11.1 7.6 12 0Z'/%3E%3C/svg%3E");
+  --chrome: linear-gradient(180deg, #ffffff 0%, #eef0f3 36%, #a3a8b2 52%, #e4e7eb 68%, #ffffff 100%);
+}
+/* Estrellitas sueltas: se prenden de golpe, brillan un instante y se apagan
+   (quedan apagadas el resto del ciclo, así el parpadeo se nota). */
+@keyframes twinkle {
+  0% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0deg);
+  }
+  8% {
+    opacity: 1;
+    transform: scale(1.25) rotate(25deg);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(0.95) rotate(45deg);
+  }
+  32% {
+    opacity: 0;
+    transform: scale(0.2) rotate(90deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(90deg);
+  }
+}
+/* Estrellitas de títulos y logo: casi siempre prendidas, pestañean (se apagan
+   y vuelven a prenderse con un destello). */
+@keyframes twinkleSoft {
+  0%,
+  58%,
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+  66% {
+    opacity: 0;
+    transform: scale(0.2) rotate(45deg);
+  }
+  74% {
+    opacity: 0;
+    transform: scale(0.2) rotate(45deg);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1.3) rotate(90deg);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(1) rotate(90deg);
+  }
+}
+@keyframes glint {
+  0%,
+  62% {
+    background-position: 100% 0, 0 0;
+  }
+  92%,
+  100% {
+    background-position: 0% 0, 0 0;
+  }
+}
+@keyframes btnShine {
+  0%,
+  72% {
+    transform: translateX(-130%) skewX(-20deg);
+  }
+  100% {
+    transform: translateX(330%) skewX(-20deg);
+  }
+}
+
+.sparkle {
+  display: inline-block;
+  color: #fff;
+  flex-shrink: 0;
+}
+.sparkle.glow {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.9)) drop-shadow(0 0 12px rgba(170, 190, 255, 0.5));
+}
+.sparkle.twinkle {
+  animation: twinkleSoft 3.2s ease-in-out infinite;
+}
+.sparkle-field {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.sparkle-field .sparkle {
+  position: absolute;
+  opacity: 0;
+  animation: twinkle 3s ease-out infinite;
+}
+
+/* Texto cromado (plateado) */
+.chrome {
+  background: var(--chrome);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+/* Estrellita que titila al final de un título */
+.spark-title::after {
+  content: "";
+  display: inline-block;
+  width: 0.36em;
+  height: 0.36em;
+  margin-left: 0.16em;
+  vertical-align: 0.62em;
+  background: #fff;
+  -webkit-mask: var(--star) center / contain no-repeat;
+  mask: var(--star) center / contain no-repeat;
+  animation: twinkleSoft 2.7s ease-in-out infinite;
+}
+/* Estrellita fija delante de una etiqueta (30% OFF, mayorista) */
+.spark-badge::before {
+  content: "";
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  margin-right: 3px;
+  vertical-align: -0.12em;
+  background: currentColor;
+  -webkit-mask: var(--star) center / contain no-repeat;
+  mask: var(--star) center / contain no-repeat;
+}
+
+/* Emblema del header: plateado con un destello que lo cruza cada tanto */
+.logo-mark {
+  display: block;
+  -webkit-mask: url(/logo.png) center / contain no-repeat;
+  mask: url(/logo.png) center / contain no-repeat;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.95) 50%, transparent 58%) no-repeat,
+    linear-gradient(180deg, #ffffff 0%, #e9ebef 42%, #a7acb6 56%, #f1f2f5 72%, #ffffff 100%);
+  background-size: 260% 100%, 100% 100%;
+  animation: glint 6s ease-in-out infinite;
+}
+.logo-spark {
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Emblema de joya flotando en la portada */
+.hero-emblem {
+  position: absolute;
+  top: -44px;
+  right: -14px;
+  width: clamp(150px, 20vw, 250px);
+  height: auto;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.6));
+  animation: floaty 6s ease-in-out infinite;
+}
+
+/* Botón principal con un brillo que lo recorre */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.btn-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  pointer-events: none;
+  animation: btnShine 4.8s ease-in-out infinite;
+}
+
+@media (max-width: 880px) {
+  .sparkle-field .desk {
+    display: none;
+  }
+  .hero-emblem {
+    top: -34px;
+    right: -6px;
+  }
+}
+/* Variantes sin movimiento: solo se prenden y apagan (para "reducir movimiento"). */
+@keyframes blinkField {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  20% {
+    opacity: 1;
+  }
+  32%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes blinkOnly {
+  0%,
+  58%,
+  100% {
+    opacity: 1;
+  }
+  66%,
+  74% {
+    opacity: 0;
+  }
+  82% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-mark,
+  .hero-emblem,
+  .btn-shine::after {
+    animation: none !important;
+  }
+  .btn-shine::after {
+    display: none;
+  }
+  /* Las estrellitas siguen pestañeando, pero sin girar ni crecer. */
+  .sparkle-field .sparkle {
+    animation-name: blinkField;
+  }
+  .sparkle.twinkle,
+  .spark-title::after {
+    animation-name: blinkOnly;
+  }
+}
+
 /* Drawer / overlay ------------------------------------------------- */
 .overlay {
   position: fixed;

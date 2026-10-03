@@ -11,7 +11,7 @@ export default function FeaturedProducts() {
   return (
     <section id="nuevos" className="wrap section">
       <div className="section-head" data-reveal>
-        <h2 className="anton">
+        <h2 className="anton chrome spark-title">
           Nuevos<br />productos
         </h2>
         <p>Lo último en zapatillas y prendas. Stock limitado — cuando se va, se va.</p>

@@ -25,7 +25,7 @@ export default function ProductCard({ product, reveal = true }) {
       <Link to={url} className="prod-media" aria-label={product.name}>
         <Img src={product.image} alt={product.name} w={440} quality={80} />
         {product.tag && !soldOut && (
-          <span className="tag-badge">{product.tag}</span>
+          <span className="tag-badge spark-badge">{product.tag}</span>
         )}
         {hasDiscount && !soldOut && (
           <span className="off-badge">-{off}%</span>
@@ -56,7 +56,7 @@ export default function ProductCard({ product, reveal = true }) {
         {!soldOut && (
           <div className="prod-cash">
             💵 <b>{money(cashPrice)}</b> efectivo/transf.
-            <span className="cash-off">30% OFF</span>
+            <span className="cash-off spark-badge">30% OFF</span>
           </div>
         )}
       </Link>

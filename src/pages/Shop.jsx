@@ -5,6 +5,15 @@ import { useStore, effPrice } from '../store/useStore'
 import { useReveal } from '../hooks/useReveal'
 import { useSEO } from '../hooks/useSEO'
 import ProductCard from '../components/ProductCard'
+import { SparkleField } from '../components/Sparkle'
+
+const TITLE_SPARKLES = [
+  { top: '8%', left: '42%', size: 12, delay: 0 },
+  { top: '58%', left: '63%', size: 18, delay: 1.5 },
+  { top: '-6%', left: '84%', size: 10, delay: 2.6 },
+  { top: '66%', left: '93%', size: 14, delay: 0.9, desk: true },
+  { top: '28%', left: '74%', size: 8, delay: 3.3, desk: true },
+]
 
 const SORTS = [
   ['relevancia', 'Relevancia'],
@@ -84,12 +93,13 @@ export default function Shop() {
 
   return (
     <div className="wrap section">
-      <div style={{ marginBottom: 26 }}>
+      <div style={{ marginBottom: 26, position: 'relative' }}>
+        <SparkleField items={TITLE_SPARKLES} />
         <div style={{ fontSize: 12, color: 'var(--faint)', marginBottom: 10 }}>
           <Link to="/" className="muted">Inicio</Link> / <span>Tienda</span>
           {cat && <span> / {cat}</span>}
         </div>
-        <h1 className="anton" style={{ fontSize: 'clamp(34px,5vw,64px)', lineHeight: 0.95 }}>
+        <h1 className="anton chrome spark-title" style={{ fontSize: 'clamp(34px,5vw,64px)', lineHeight: 0.95 }}>
           {cat || (q ? `“${q}”` : 'Catálogo')}
         </h1>
       </div>

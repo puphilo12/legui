@@ -3,6 +3,18 @@ import { Link } from 'react-router-dom'
 import { ArrowUpRight } from 'lucide-react'
 import { useStore } from '../store/useStore'
 import Img from '../components/Img'
+import { SparkleField } from '../components/Sparkle'
+
+const SPARKLES = [
+  { top: '7%', left: '47%', size: 14, delay: 0 },
+  { top: '16%', left: '95%', size: 22, delay: 1.3 },
+  { top: '3%', left: '72%', size: 10, delay: 2.2 },
+  { top: '58%', left: '50%', size: 12, delay: 0.7, desk: true },
+  { top: '86%', left: '93%', size: 16, delay: 2.8 },
+  { top: '91%', left: '46%', size: 9, delay: 1.8 },
+  { top: '34%', left: '2%', size: 10, delay: 3.2, desk: true },
+  { top: '74%', left: '31%', size: 8, delay: 0.4, desk: true },
+]
 
 const STATS = [
   ['240+', 'Modelos'],
@@ -30,6 +42,7 @@ export default function Hero() {
 
   return (
     <section id="top" onMouseMove={onMove} onMouseLeave={onLeave} style={{ position: 'relative' }}>
+      <SparkleField items={SPARKLES} />
       <div className="wrap">
       <div
         className="hero-grid"
@@ -51,7 +64,7 @@ export default function Hero() {
               const tail = words.pop()
               return (
                 <span key={i}>
-                  {words.join(' ')} <span style={{ color: '#fff' }}>{tail}</span>
+                  {words.join(' ')} <span className="chrome spark-title">{tail}</span>
                 </span>
               )
             })}
@@ -62,7 +75,7 @@ export default function Hero() {
           </p>
 
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-            <Link to="/tienda" className="btn btn-blue">Comprar ahora</Link>
+            <Link to="/tienda" className="btn btn-blue btn-shine">Comprar ahora</Link>
             <Link to="/#lookbook" className="btn btn-ghost">Ver lookbook</Link>
           </div>
 
@@ -79,21 +92,7 @@ export default function Hero() {
         </div>
 
         <div style={{ position: 'relative', perspective: 1100, zIndex: 1 }}>
-          <div
-            style={{
-              position: 'absolute',
-              top: -30,
-              right: -10,
-              width: 140,
-              height: 140,
-              background: 'var(--blue)',
-              borderRadius: '50%',
-              filter: 'blur(2px)',
-              opacity: 0.9,
-              animation: 'floaty 6s ease-in-out infinite',
-              zIndex: 0,
-            }}
-          />
+          <img src="/logo-joya.png" alt="" aria-hidden="true" className="hero-emblem" />
           <div
             style={{
               position: 'absolute',

@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { Instagram, Music2, Youtube, Twitter, Facebook } from 'lucide-react'
-import Logo from './Logo'
 import { useStore } from '../store/useStore'
 import { socialUrl } from '../utils/format'
 
@@ -29,7 +28,9 @@ export default function Footer() {
         }}
       >
         <div style={{ maxWidth: 340 }}>
-          <Logo height={34} />
+          <Link to="/" aria-label="LEGUI — inicio" style={{ display: 'inline-block' }}>
+            <img src="/logo-joya-full.png" alt="Legui Importados Arg" width={230} height={166} loading="lazy" style={{ width: 230, height: 'auto' }} />
+          </Link>
           <p style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginTop: 14 }}>
             Streetwear y zapatillas urbanas. Hecho en la ciudad, para la ciudad. Drops semanales y ediciones limitadas.
           </p>

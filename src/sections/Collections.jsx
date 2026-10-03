@@ -24,7 +24,7 @@ export default function Collections() {
   return (
     <section id="colecciones" className="wrap section">
       <h2
-        className="anton"
+        className="anton chrome spark-title"
         data-reveal
         style={{ fontSize: 'clamp(30px,4.5vw,58px)', margin: '0 0 32px' }}
       >
